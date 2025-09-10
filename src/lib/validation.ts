@@ -45,12 +45,12 @@ export const reservationSchema = z.object({
     .string()
     .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Format d\'heure invalide'),
   passagers: z
-    .string()
-    .transform(Number)
+    .union([z.string(), z.number()])
+    .transform((val) => typeof val === 'string' ? parseInt(val) : val)
     .refine((n) => n >= 1 && n <= 8, 'Le nombre de passagers doit être entre 1 et 8'),
   duree: z
-    .string()
-    .transform(Number)
+    .union([z.string(), z.number()])
+    .transform((val) => typeof val === 'string' ? parseInt(val) : val)
     .refine((n) => n >= 1 && n <= 24, 'La durée doit être entre 1 et 24 heures')
     .optional(),
   prenom: z

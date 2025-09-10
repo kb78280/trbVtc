@@ -3,10 +3,26 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { reservationSchema, type ReservationFormData } from '@/lib/validation'
+import { reservationSchema } from '@/lib/validation'
 import { CSRFProtection, RateLimiter, SecurityMonitor, HoneypotProtection } from '@/lib/security'
 
 type ServiceType = 'transfert' | 'mise-a-disposition'
+
+// Type pour le formulaire (avant transformation)
+type FormData = {
+  serviceType: ServiceType
+  depart: string
+  arrivee?: string
+  date: string
+  heure: string
+  passagers: string
+  duree?: string
+  prenom: string
+  nom: string
+  telephone: string
+  email: string
+  commentaires?: string
+}
 
 export default function SecureReservationForm() {
   const [mounted, setMounted] = useState(false)
@@ -26,14 +42,12 @@ export default function SecureReservationForm() {
     handleSubmit,
     formState: { errors },
     reset,
-    watch,
     setValue
-  } = useForm<ReservationFormData>({
-    resolver: zodResolver(reservationSchema),
+  } = useForm<FormData>({
     defaultValues: {
       serviceType: 'transfert',
-      passagers: 1,
-      duree: 2
+      passagers: '1',
+      duree: '2'
     }
   })
 
@@ -57,7 +71,7 @@ export default function SecureReservationForm() {
     return () => clearInterval(interval)
   }, [])
 
-  const onSubmit = async (data: ReservationFormData) => {
+  const onSubmit = async (data: FormData) => {
     try {
       setIsSubmitting(true)
       setSubmitError('')

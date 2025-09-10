@@ -178,8 +178,7 @@ export class HoneypotProtection {
         width: '1px',
         height: '1px',
         opacity: 0,
-        pointerEvents: 'none',
-        tabIndex: -1
+        pointerEvents: 'none'
       }
     }
   }

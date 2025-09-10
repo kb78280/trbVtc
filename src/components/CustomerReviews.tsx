@@ -109,7 +109,7 @@ export default function CustomerReviews() {
               </div>
               
               <blockquote className="text-gray-700 mb-4">
-                "{review.comment}"
+                &ldquo;{review.comment}&rdquo;
               </blockquote>
               
               <div className="flex justify-between items-center text-xs text-gray-500">

@@ -25,15 +25,15 @@ export default function AProposPage() {
                 Notre histoire
               </h2>
               <p className="text-lg text-gray-600 mb-6">
-                Depuis plus de 10 ans, VTC Paris s'est imposé comme une référence dans le transport de personnes à Paris et en région parisienne. 
+                Depuis plus de 10 ans, VTC Paris s&apos;est imposé comme une référence dans le transport de personnes à Paris et en région parisienne. 
                 Nous avons bâti notre réputation sur la qualité de service, la ponctualité et la satisfaction de nos clients.
               </p>
               <p className="text-gray-600 mb-6">
                 Notre équipe de chauffeurs professionnels partage les mêmes valeurs : excellence du service, respect du client et passion pour leur métier. 
-                Chaque course est pour nous l'occasion de confirmer votre confiance.
+                Chaque course est pour nous l&apos;occasion de confirmer votre confiance.
               </p>
               <p className="text-gray-600">
-                Que ce soit pour un transfert vers l'aéroport, un déplacement professionnel ou un événement spécial, 
+                Que ce soit pour un transfert vers l&apos;aéroport, un déplacement professionnel ou un événement spécial, 
                 nous mettons tout en œuvre pour que votre voyage soit une expérience agréable et sans stress.
               </p>
             </div>
@@ -76,7 +76,7 @@ export default function AProposPage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Fiabilité</h3>
                 <p className="text-gray-600">
-                  Nous nous engageons à être à l'heure et à respecter nos engagements. 
+                  Nous nous engageons à être à l&apos;heure et à respecter nos engagements. 
                   Votre confiance est notre priorité absolue.
                 </p>
               </div>
