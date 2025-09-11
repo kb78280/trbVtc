@@ -129,18 +129,19 @@ export default function InteractiveMap({
     })
     
     // DIAGNOSTIC: Vérifier si les références changent
+    const windowDebug = window as any
     console.log(`🔄 [MAP] [${effectId}] REFS CHECK:`, {
-      originRef: origin === window.lastOrigin ? 'SAME' : 'DIFFERENT',
-      destinationRef: destination === window.lastDestination ? 'SAME' : 'DIFFERENT', 
-      waypointsRef: validWaypoints === window.lastValidWaypoints ? 'SAME' : 'DIFFERENT',
-      callbackRef: onRouteCalculated === window.lastOnRouteCalculated ? 'SAME' : 'DIFFERENT'
+      originRef: origin === windowDebug.lastOrigin ? 'SAME' : 'DIFFERENT',
+      destinationRef: destination === windowDebug.lastDestination ? 'SAME' : 'DIFFERENT', 
+      waypointsRef: validWaypoints === windowDebug.lastValidWaypoints ? 'SAME' : 'DIFFERENT',
+      callbackRef: onRouteCalculated === windowDebug.lastOnRouteCalculated ? 'SAME' : 'DIFFERENT'
     })
     
     // Stocker les références pour comparaison
-    window.lastOrigin = origin
-    window.lastDestination = destination  
-    window.lastValidWaypoints = validWaypoints
-    window.lastOnRouteCalculated = onRouteCalculated
+    windowDebug.lastOrigin = origin
+    windowDebug.lastDestination = destination  
+    windowDebug.lastValidWaypoints = validWaypoints
+    windowDebug.lastOnRouteCalculated = onRouteCalculated
     
     console.log(`🔄 [MAP] [${effectId}] APPEL calculateRoute()`)
     calculateRoute()
