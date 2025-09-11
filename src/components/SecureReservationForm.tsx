@@ -55,8 +55,9 @@ export default function SecureReservationForm() {
   const arriveeValueRef = useRef('')
   
   // État pour les étapes (mise-à-disposition uniquement)
-  const [etapes, setEtapes] = useState<string[]>([''])
+  const [etapes, setEtapes] = useState<{id: number, value: string}[]>([{id: 0, value: ''}])
   const [etapesPlaces, setEtapesPlaces] = useState<(google.maps.places.PlaceResult | null)[]>([null])
+  const [nextEtapeId, setNextEtapeId] = useState(1)
   
   // Clés pour forcer le re-render des composants d'autocomplétion
   const [departKey, setDepartKey] = useState(0)
@@ -180,7 +181,7 @@ export default function SecureReservationForm() {
       const validatedData = reservationSchema.parse({
         ...data,
         serviceType,
-        etapes: serviceType === 'mise-a-disposition' ? etapes.filter(etape => etape.trim() !== '') : undefined
+        etapes: serviceType === 'mise-a-disposition' ? etapes.map(e => e.value).filter(value => value.trim() !== '') : undefined
       })
 
       // Simulation d'envoi (remplacer par votre API)
@@ -203,8 +204,9 @@ export default function SecureReservationForm() {
       setOriginPlace(null)
       setDestinationPlace(null)
       setRouteInfo(null)
-      setEtapes([''])
+      setEtapes([{id: 0, value: ''}])
       setEtapesPlaces([null])
+      setNextEtapeId(1)
       
       // Générer un nouveau token CSRF
       const newToken = CSRFProtection.setToken()
@@ -239,8 +241,9 @@ export default function SecureReservationForm() {
     setRouteInfo(null)
     
     // Reset des étapes
-    setEtapes([''])
+    setEtapes([{id: 0, value: ''}])
     setEtapesPlaces([null])
+    setNextEtapeId(1)
     
     // Forcer le re-render des composants d'autocomplétion
     setDepartKey(prev => prev + 1)
@@ -262,8 +265,9 @@ export default function SecureReservationForm() {
   // Fonctions pour gérer les étapes
   const addEtape = () => {
     if (etapes.length < 10) {
-      setEtapes([...etapes, ''])
+      setEtapes([...etapes, {id: nextEtapeId, value: ''}])
       setEtapesPlaces([...etapesPlaces, null])
+      setNextEtapeId(prev => prev + 1)
     }
   }
 
@@ -280,7 +284,7 @@ export default function SecureReservationForm() {
     const newEtapes = [...etapes]
     const newEtapesPlaces = [...etapesPlaces]
     
-    newEtapes[index] = value
+    newEtapes[index] = {...newEtapes[index], value}
     newEtapesPlaces[index] = placeDetails || null
     
     setEtapes(newEtapes)
@@ -288,6 +292,7 @@ export default function SecureReservationForm() {
     
     console.log('🟡 [ETAPES] Updated:', { 
       index, 
+      etapeId: newEtapes[index].id,
       value, 
       hasPlace: !!placeDetails,
       totalValidPlaces: newEtapesPlaces.filter(p => p !== null).length
@@ -302,9 +307,16 @@ export default function SecureReservationForm() {
 
   // Waypoints mémorisés pour éviter les recalculs inutiles
   const memoizedValidWaypoints = useMemo(() => {
-    if (serviceType !== 'mise-a-disposition') return []
+    if (serviceType !== 'mise-a-disposition') {
+      console.log('🗺️ [PARENT] Pas de waypoints (service transfert)')
+      return []
+    }
     const validPlaces = etapesPlaces.filter(place => place !== null) as google.maps.places.PlaceResult[]
-    console.log('🗺️ [PARENT] Waypoints mémorisés:', validPlaces.map(p => p.formatted_address))
+    console.log('🗺️ [PARENT] Waypoints mémorisés:', {
+      totalEtapes: etapesPlaces.length,
+      validPlaces: validPlaces.length,
+      addresses: validPlaces.map(p => p.formatted_address)
+    })
     return validPlaces
   }, [serviceType, etapesPlaces])
 
@@ -607,18 +619,18 @@ export default function SecureReservationForm() {
                   Ajoutez jusqu'à 10 étapes pour votre trajet (optionnel)
                 </p>
                 
-                <div className="space-y-3" key={etapesKey}>
+                <div className="space-y-3">
                   {etapes.map((etape, index) => (
-                    <div key={`${etapesKey}-${index}`} className="flex items-center gap-3">
+                    <div key={etape.id} className="flex items-center gap-3">
                       <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-800">
                         {index + 1}
                       </div>
                       <div className="flex-1">
                         <EtapeAutocomplete
-                          key={`${etapesKey}-${index}`}
+                          key={etape.id}
                           value=""
                           onChange={(value, placeDetails) => {
-                            console.log('🟡 [PARENT] 📨 ETAPE onChange:', { index, value, hasPlace: !!placeDetails })
+                            console.log('🟡 [PARENT] 📨 ETAPE onChange:', { index, etapeId: etape.id, value, hasPlace: !!placeDetails })
                             updateEtape(index, value, placeDetails)
                           }}
                           placeholder={`Étape ${index + 1} (optionnel)`}
