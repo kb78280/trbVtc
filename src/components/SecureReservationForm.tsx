@@ -16,7 +16,7 @@ type ServiceType = 'transfert' | 'mise-a-disposition'
 type FormData = {
   serviceType: ServiceType
   depart: string
-  arrivee?: string
+  arrivee: string
   date: string
   heure: string
   passagers: string
@@ -56,6 +56,11 @@ export default function SecureReservationForm() {
   
   // État pour les étapes (mise-à-disposition uniquement)
   const [etapes, setEtapes] = useState<string[]>([''])
+  
+  // Clés pour forcer le re-render des composants d'autocomplétion
+  const [departKey, setDepartKey] = useState(0)
+  const [arriveeKey, setArriveeKey] = useState(0)
+  const [etapesKey, setEtapesKey] = useState(0)
 
   // Debug: Log des changements d'états (SANS re-render)
   useEffect(() => {
@@ -136,15 +141,13 @@ export default function SecureReservationForm() {
       })
       
       setValue('depart', currentDepartValue)
-      if (serviceType === 'transfert') {
-        setValue('arrivee', currentArriveeValue)
-      }
+      setValue('arrivee', currentArriveeValue)
 
       // Validation manuelle des adresses
       if (!currentDepartValue.trim()) {
         throw new Error('L\'adresse de départ est requise.')
       }
-      if (serviceType === 'transfert' && !currentArriveeValue.trim()) {
+      if (!currentArriveeValue.trim()) {
         throw new Error('L\'adresse d\'arrivée est requise.')
       }
 
@@ -213,20 +216,44 @@ export default function SecureReservationForm() {
     }
   }
 
+  // Fonction pour reset complet du formulaire
+  const resetCompleteForm = () => {
+    console.log('🔄 [FORM] RESET COMPLET du formulaire')
+    
+    // Reset React Hook Form
+    reset()
+    
+    // Reset des références d'adresses
+    departValueRef.current = ''
+    arriveeValueRef.current = ''
+    
+    // Reset des états d'autocomplétion
+    setIsDepartAutocompleted(false)
+    setIsArriveeAutocompleted(false)
+    
+    // Reset Google Maps
+    setOriginPlace(null)
+    setDestinationPlace(null)
+    setRouteInfo(null)
+    
+    // Reset des étapes
+    setEtapes([''])
+    
+    // Forcer le re-render des composants d'autocomplétion
+    setDepartKey(prev => prev + 1)
+    setArriveeKey(prev => prev + 1)
+    setEtapesKey(prev => prev + 1)
+  }
+
   const handleServiceTypeChange = (type: ServiceType) => {
+    console.log('🔄 [FORM] Changement de type de service:', { from: serviceType, to: type })
+    
+    // Reset complet du formulaire
+    resetCompleteForm()
+    
+    // Définir le nouveau type
     setServiceType(type)
     setValue('serviceType', type)
-    
-    // Réinitialiser les champs d'adresse si on passe à "mise-a-disposition"
-    if (type === 'mise-a-disposition') {
-      arriveeValueRef.current = ''
-      setIsArriveeAutocompleted(false)
-      setDestinationPlace(null)
-      setRouteInfo(null)
-    } else {
-      // Réinitialiser les étapes si on passe à "transfert"
-      setEtapes([''])
-    }
   }
 
   // Fonctions pour gérer les étapes
@@ -340,6 +367,7 @@ export default function SecureReservationForm() {
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
+                    key={departKey}
                     value="" // Pas de synchronisation externe
                     onChange={(value, placeDetails, isAutocompleted) => {
                       console.log('🏠 [PARENT] 📨 DEPART onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
@@ -363,35 +391,34 @@ export default function SecureReservationForm() {
                   {/* Validation manuelle des adresses - pas d'erreurs React Hook Form */}
                 </div>
 
-                {serviceType === 'transfert' && (
-                  <div>
-                    <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
-                      Lieu d'arrivée *
-                    </label>
-                    <ArrivalAutocomplete
-                      value="" // Pas de synchronisation externe
-                      onChange={(value, placeDetails, isAutocompleted) => {
-                        console.log('🏠 [PARENT] 📨 ARRIVEE onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
-                        
-                        // ✅ AUCUN setState pour la valeur → AUCUN re-render
-                        arriveeValueRef.current = value
-                        setIsArriveeAutocompleted(!!isAutocompleted)
-                        
-                        if (placeDetails && placeDetails.geometry) {
-                          console.log('🏠 [PARENT] ✅ ARRIVEE place avec géométrie:', placeDetails.formatted_address)
-                          setDestinationPlace(placeDetails)
-                        } else {
-                          console.log('🏠 [PARENT] ❌ ARRIVEE pas de géométrie, clearing place')
-                          setDestinationPlace(null)
-                        }
-                      }}
-                      className=""
-                      required
-                      disabled={rateLimitInfo.blocked || isSubmitting}
-                    />
-                    {/* Validation manuelle des adresses - pas d'erreurs React Hook Form */}
-                  </div>
-                )}
+                <div>
+                  <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
+                    Lieu d'arrivée *
+                  </label>
+                  <ArrivalAutocomplete
+                    key={arriveeKey}
+                    value="" // Pas de synchronisation externe
+                    onChange={(value, placeDetails, isAutocompleted) => {
+                      console.log('🏠 [PARENT] 📨 ARRIVEE onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
+                      
+                      // ✅ AUCUN setState pour la valeur → AUCUN re-render
+                      arriveeValueRef.current = value
+                      setIsArriveeAutocompleted(!!isAutocompleted)
+                      
+                      if (placeDetails && placeDetails.geometry) {
+                        console.log('🏠 [PARENT] ✅ ARRIVEE place avec géométrie:', placeDetails.formatted_address)
+                        setDestinationPlace(placeDetails)
+                      } else {
+                        console.log('🏠 [PARENT] ❌ ARRIVEE pas de géométrie, clearing place')
+                        setDestinationPlace(null)
+                      }
+                    }}
+                    className=""
+                    required
+                    disabled={rateLimitInfo.blocked || isSubmitting}
+                  />
+                  {/* Validation manuelle des adresses - pas d'erreurs React Hook Form */}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -431,7 +458,7 @@ export default function SecureReservationForm() {
                   </div>
                 </div>
 
-                <div className={`grid gap-4 ${serviceType === 'mise-a-disposition' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-4 items-end ${serviceType === 'mise-a-disposition' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <div className="flex flex-col">
                     <label htmlFor="passagers" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de passagers
@@ -547,9 +574,9 @@ export default function SecureReservationForm() {
                   Ajoutez jusqu'à 10 étapes pour votre trajet (optionnel)
                 </p>
                 
-                <div className="space-y-3">
+                <div className="space-y-3" key={etapesKey}>
                   {etapes.map((etape, index) => (
-                    <div key={index} className="flex items-center gap-3">
+                    <div key={`${etapesKey}-${index}`} className="flex items-center gap-3">
                       <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-800">
                         {index + 1}
                       </div>

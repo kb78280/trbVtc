@@ -30,9 +30,9 @@ export const reservationSchema = z.object({
     .transform(sanitizeInput),
   arrivee: z
     .string()
+    .min(3, 'Le lieu d\'arrivée doit contenir au moins 3 caractères')
     .max(200, 'Le lieu d\'arrivée ne peut pas dépasser 200 caractères')
-    .transform(sanitizeInput)
-    .optional(),
+    .transform(sanitizeInput),
   date: z
     .string()
     .refine((date) => {
