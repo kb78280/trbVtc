@@ -26,6 +26,7 @@ type FormData = {
   telephone: string
   email: string
   commentaires?: string
+  etapes?: string[]
 }
 
 export default function SecureReservationForm() {
@@ -51,6 +52,9 @@ export default function SecureReservationForm() {
   // Références pour les valeurs finales (pas de re-render)
   const departValueRef = useRef('')
   const arriveeValueRef = useRef('')
+  
+  // État pour les étapes (mise-à-disposition uniquement)
+  const [etapes, setEtapes] = useState<string[]>([''])
 
   // Debug: Log des changements d'états (SANS re-render)
   useEffect(() => {
@@ -170,7 +174,8 @@ export default function SecureReservationForm() {
       // Validation des données côté client
       const validatedData = reservationSchema.parse({
         ...data,
-        serviceType
+        serviceType,
+        etapes: serviceType === 'mise-a-disposition' ? etapes.filter(etape => etape.trim() !== '') : undefined
       })
 
       // Simulation d'envoi (remplacer par votre API)
@@ -193,6 +198,7 @@ export default function SecureReservationForm() {
       setOriginPlace(null)
       setDestinationPlace(null)
       setRouteInfo(null)
+      setEtapes([''])
       
       // Générer un nouveau token CSRF
       const newToken = CSRFProtection.setToken()
@@ -216,7 +222,30 @@ export default function SecureReservationForm() {
       setIsArriveeAutocompleted(false)
       setDestinationPlace(null)
       setRouteInfo(null)
+    } else {
+      // Réinitialiser les étapes si on passe à "transfert"
+      setEtapes([''])
     }
+  }
+
+  // Fonctions pour gérer les étapes
+  const addEtape = () => {
+    if (etapes.length < 10) {
+      setEtapes([...etapes, ''])
+    }
+  }
+
+  const removeEtape = (index: number) => {
+    if (etapes.length > 1) {
+      const newEtapes = etapes.filter((_, i) => i !== index)
+      setEtapes(newEtapes)
+    }
+  }
+
+  const updateEtape = (index: number, value: string) => {
+    const newEtapes = [...etapes]
+    newEtapes[index] = value
+    setEtapes(newEtapes)
   }
 
   if (!mounted) {
@@ -457,13 +486,15 @@ export default function SecureReservationForm() {
                         }`}
                         disabled={rateLimitInfo.blocked || isSubmitting}
                       >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 12, 24].map(num => (
+                        {Array.from({length: 23}, (_, i) => i + 2).map(num => (
                           <option key={num} value={num}>{num} heure{num > 1 ? 's' : ''}</option>
                         ))}
                       </select>
                       {errors.duree && (
                         <p className="mt-1 text-sm text-red-600">{errors.duree.message}</p>
                       )}
+                      {/* Ligne vide pour l'alignement */}
+                      {!errors.duree && <div className="mt-1 h-6"></div>}
                     </div>
                   )}
                 </div>
@@ -499,6 +530,58 @@ export default function SecureReservationForm() {
                 
                 <div className="mt-3 text-xs text-gray-500">
                   💡 Les informations de trajet sont données à titre indicatif et peuvent varier selon le trafic.
+                </div>
+              </div>
+            )}
+
+            {/* Champ Etapes pour mise-à-disposition */}
+            {serviceType === 'mise-a-disposition' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Étapes du trajet</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Ajoutez jusqu'à 10 étapes pour votre trajet (optionnel)
+                </p>
+                
+                <div className="space-y-3">
+                  {etapes.map((etape, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-800">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={etape}
+                          onChange={(e) => updateEtape(index, e.target.value)}
+                          placeholder={`Étape ${index + 1} (optionnel)`}
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
+                          disabled={rateLimitInfo.blocked || isSubmitting}
+                        />
+                      </div>
+                      {etapes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeEtape(index)}
+                          className="flex-shrink-0 w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center text-red-600 transition-colors"
+                          disabled={rateLimitInfo.blocked || isSubmitting}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {etapes.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={addEtape}
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                      disabled={rateLimitInfo.blocked || isSubmitting}
+                    >
+                      <span className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-sm">+</span>
+                      Ajouter une étape ({etapes.length}/10)
+                    </button>
+                  )}
                 </div>
               </div>
             )}

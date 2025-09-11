@@ -55,7 +55,7 @@ export const reservationSchema = z.object({
   duree: z
     .union([z.string(), z.number()])
     .transform((val) => typeof val === 'string' ? parseInt(val) : val)
-    .refine((n) => n >= 1 && n <= 24, 'La durée doit être entre 1 et 24 heures')
+    .refine((n) => n >= 2 && n <= 24, 'La durée doit être entre 2 et 24 heures')
     .optional(),
   prenom: z
     .string()
@@ -82,6 +82,10 @@ export const reservationSchema = z.object({
     .string()
     .max(500, 'Les commentaires ne peuvent pas dépasser 500 caractères')
     .transform(sanitizeInput)
+    .optional(),
+  etapes: z
+    .array(z.string().transform(sanitizeInput))
+    .max(10, 'Maximum 10 étapes autorisées')
     .optional()
 })
 
