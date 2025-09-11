@@ -43,24 +43,18 @@ export default function SecureReservationForm() {
   const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
   
-  // États pour les valeurs d'adresse (isolés)
-  const [departValue, setDepartValue] = useState('')
-  const [arriveeValue, setArriveeValue] = useState('')
-  
-  // États d'autocomplétion pour l'affichage de la carte
+  // États d'autocomplétion pour l'affichage de la carte (PAS de valeurs texte)
   const [isDepartAutocompleted, setIsDepartAutocompleted] = useState(false)
   const [isArriveeAutocompleted, setIsArriveeAutocompleted] = useState(false)
+  
+  // Références pour les valeurs finales (pas de re-render)
+  const departValueRef = useRef('')
+  const arriveeValueRef = useRef('')
 
-  // Debug: Log des changements d'états
+  // Debug: Log des changements d'états (SANS re-render)
   useEffect(() => {
-    console.log('🏠 [PARENT] State change - departValue:', departValue)
-    console.log('🏠 [PARENT] ⚠️ PARENT RE-RENDER causé par departValue change')
-  }, [departValue])
-
-  useEffect(() => {
-    console.log('🏠 [PARENT] State change - arriveeValue:', arriveeValue)
-    console.log('🏠 [PARENT] ⚠️ PARENT RE-RENDER causé par arriveeValue change')
-  }, [arriveeValue])
+    console.log('🏠 [PARENT] Autocomplete states:', { isDepartAutocompleted, isArriveeAutocompleted })
+  }, [isDepartAutocompleted, isArriveeAutocompleted])
 
   useEffect(() => {
     console.log('🗺️ [MAP] State change - originPlace:', originPlace?.formatted_address || 'null')
@@ -126,17 +120,24 @@ export default function SecureReservationForm() {
       setSubmitError('')
 
       // Synchroniser les valeurs d'adresse avec React Hook Form AVANT soumission
-      console.log('[FORM] Syncing addresses before submit:', { departValue, arriveeValue })
-      setValue('depart', departValue)
+      const currentDepartValue = departValueRef.current
+      const currentArriveeValue = arriveeValueRef.current
+      
+      console.log('[FORM] Syncing addresses before submit:', { 
+        currentDepartValue, 
+        currentArriveeValue 
+      })
+      
+      setValue('depart', currentDepartValue)
       if (serviceType === 'transfert') {
-        setValue('arrivee', arriveeValue)
+        setValue('arrivee', currentArriveeValue)
       }
 
       // Validation manuelle des adresses
-      if (!departValue.trim()) {
+      if (!currentDepartValue.trim()) {
         throw new Error('L\'adresse de départ est requise.')
       }
-      if (serviceType === 'transfert' && !arriveeValue.trim()) {
+      if (serviceType === 'transfert' && !currentArriveeValue.trim()) {
         throw new Error('L\'adresse d\'arrivée est requise.')
       }
 
@@ -183,8 +184,10 @@ export default function SecureReservationForm() {
       reset()
       
       // Réinitialiser les états locaux
-      setDepartValue('')
-      setArriveeValue('')
+      departValueRef.current = ''
+      arriveeValueRef.current = ''
+      setIsDepartAutocompleted(false)
+      setIsArriveeAutocompleted(false)
       setOriginPlace(null)
       setDestinationPlace(null)
       setRouteInfo(null)
@@ -207,7 +210,8 @@ export default function SecureReservationForm() {
     
     // Réinitialiser les champs d'adresse si on passe à "mise-a-disposition"
     if (type === 'mise-a-disposition') {
-      setArriveeValue('')
+      arriveeValueRef.current = ''
+      setIsArriveeAutocompleted(false)
       setDestinationPlace(null)
       setRouteInfo(null)
     }
@@ -308,7 +312,8 @@ export default function SecureReservationForm() {
                     onChange={(value, placeDetails, isAutocompleted) => {
                       console.log('🏠 [PARENT] 📨 DEPART onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
                       
-                      setDepartValue(value)
+                      // ✅ AUCUN setState pour la valeur → AUCUN re-render
+                      departValueRef.current = value
                       setIsDepartAutocompleted(!!isAutocompleted)
                       
                       if (placeDetails && placeDetails.geometry) {
@@ -336,7 +341,8 @@ export default function SecureReservationForm() {
                       onChange={(value, placeDetails, isAutocompleted) => {
                         console.log('🏠 [PARENT] 📨 ARRIVEE onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
                         
-                        setArriveeValue(value)
+                        // ✅ AUCUN setState pour la valeur → AUCUN re-render
+                        arriveeValueRef.current = value
                         setIsArriveeAutocompleted(!!isAutocompleted)
                         
                         if (placeDetails && placeDetails.geometry) {
@@ -448,7 +454,7 @@ export default function SecureReservationForm() {
                 
                 <InteractiveMap
                   origin={originPlace}
-                  destination={serviceType === 'transfert' ? destinationPlace : null}
+                  destination={serviceType === 'transfert' ? destinationPlace || undefined : undefined}
                   height="300px"
                   onRouteCalculated={(distance, duration) => {
                     setRouteInfo({ distance, duration })
