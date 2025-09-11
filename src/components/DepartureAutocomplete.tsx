@@ -28,6 +28,7 @@ export default function DepartureAutocomplete({
   const [error, setError] = useState('')
   const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isSelecting, setIsSelecting] = useState(false) // Protection pendant sélection
   
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
@@ -45,6 +46,7 @@ export default function DepartureAutocomplete({
           autocompleteRef.current = autocomplete
 
           autocomplete.addListener('place_changed', () => {
+            setIsSelecting(true) // Marquer qu'on est en sélection
             const place = autocomplete.getPlace()
             
             console.log('[DEPART] Place changed:', {
@@ -58,6 +60,7 @@ export default function DepartureAutocomplete({
               console.warn('[DEPART] Invalid place selected')
               setError('Adresse de départ non trouvée. Veuillez sélectionner une suggestion.')
               onError?.('Adresse non trouvée')
+              setIsSelecting(false)
               return
             }
 
@@ -72,6 +75,17 @@ export default function DepartureAutocomplete({
                 inputRef.current.value = formattedAddress
               }
               onChange(formattedAddress, place)
+              
+              // Forcer encore une fois après un délai pour s'assurer
+              setTimeout(() => {
+                if (inputRef.current) {
+                  inputRef.current.value = formattedAddress
+                  console.log('[DEPART] Double-check input value:', formattedAddress)
+                }
+                setIsSelecting(false)
+              }, 100)
+            } else {
+              setIsSelecting(false)
             }
           })
 
@@ -117,6 +131,14 @@ export default function DepartureAutocomplete({
     }
   }
 
+  // Forcer la synchronisation de l'input à chaque render
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = internalValue
+      console.log('🟢 [DEPART] Force input value to:', internalValue)
+    }
+  })
+
   return (
     <div className="relative">
       <input
@@ -124,7 +146,7 @@ export default function DepartureAutocomplete({
         type="text"
         id="depart"
         name="depart"
-        value={internalValue}
+        defaultValue={internalValue} // defaultValue au lieu de value
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         placeholder="Tapez votre adresse de départ..."

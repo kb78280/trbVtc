@@ -117,6 +117,14 @@ export default function ArrivalAutocomplete({
     }
   }
 
+  // Forcer la synchronisation de l'input à chaque render
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = internalValue
+      console.log('🔵 [ARRIVEE] Force input value to:', internalValue)
+    }
+  })
+
   return (
     <div className="relative">
       <input
@@ -124,7 +132,7 @@ export default function ArrivalAutocomplete({
         type="text"
         id="arrivee"
         name="arrivee"
-        value={internalValue}
+        defaultValue={internalValue} // defaultValue au lieu de value
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         placeholder="Tapez votre adresse d'arrivée..."
