@@ -5,6 +5,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { reservationSchema } from '@/lib/validation'
 import { CSRFProtection, RateLimiter, SecurityMonitor, HoneypotProtection } from '@/lib/security'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
+import InteractiveMap from '@/components/InteractiveMap'
 
 type ServiceType = 'transfert' | 'mise-a-disposition'
 
@@ -35,6 +37,11 @@ export default function SecureReservationForm() {
     timeLeft: 0
   })
 
+  // États pour Google Maps
+  const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
+  const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
+  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
+
   const honeypot = HoneypotProtection.createHoneypot()
 
   const {
@@ -42,7 +49,8 @@ export default function SecureReservationForm() {
     handleSubmit,
     formState: { errors },
     reset,
-    setValue
+    setValue,
+    watch
   } = useForm<FormData>({
     defaultValues: {
       serviceType: 'transfert',
@@ -225,14 +233,17 @@ export default function SecureReservationForm() {
                   <label htmlFor="depart" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu de départ *
                   </label>
-                  <input
-                    {...register('depart')}
-                    type="text"
+                  <AddressAutocomplete
                     id="depart"
-                    placeholder="Adresse de départ"
-                    className={`w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 ${
-                      errors.depart ? 'border-red-500' : ''
-                    }`}
+                    name="depart"
+                    placeholder="Tapez votre adresse de départ..."
+                    value={watch('depart') || ''}
+                    onChange={(value, placeDetails) => {
+                      setValue('depart', value)
+                      setOriginPlace(placeDetails || null)
+                    }}
+                    className={errors.depart ? 'border-red-500' : ''}
+                    required
                     disabled={rateLimitInfo.blocked || isSubmitting}
                   />
                   {errors.depart && (
@@ -245,14 +256,17 @@ export default function SecureReservationForm() {
                     <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
                       Lieu d'arrivée *
                     </label>
-                    <input
-                      {...register('arrivee')}
-                      type="text"
+                    <AddressAutocomplete
                       id="arrivee"
-                      placeholder="Adresse d'arrivée"
-                      className={`w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 ${
-                        errors.arrivee ? 'border-red-500' : ''
-                      }`}
+                      name="arrivee"
+                      placeholder="Tapez votre adresse d'arrivée..."
+                      value={watch('arrivee') || ''}
+                      onChange={(value, placeDetails) => {
+                        setValue('arrivee', value)
+                        setDestinationPlace(placeDetails || null)
+                      }}
+                      className={errors.arrivee ? 'border-red-500' : ''}
+                      required
                       disabled={rateLimitInfo.blocked || isSubmitting}
                     />
                     {errors.arrivee && (
@@ -346,6 +360,39 @@ export default function SecureReservationForm() {
                 </div>
               </div>
             </div>
+
+            {/* Carte interactive - Affichée seulement si on a les deux adresses pour un transfert */}
+            {serviceType === 'transfert' && originPlace && destinationPlace && (
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Aperçu de votre trajet</h3>
+                
+                <InteractiveMap
+                  origin={originPlace}
+                  destination={destinationPlace}
+                  height="300px"
+                  onRouteCalculated={(distance, duration) => {
+                    setRouteInfo({ distance, duration })
+                  }}
+                />
+                
+                {routeInfo && (
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <div className="font-semibold text-blue-900">Distance</div>
+                      <div className="text-blue-700">{routeInfo.distance}</div>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="font-semibold text-green-900">Durée estimée</div>
+                      <div className="text-green-700">{routeInfo.duration}</div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mt-3 text-xs text-gray-500">
+                  💡 Les informations de trajet sont données à titre indicatif et peuvent varier selon le trafic.
+                </div>
+              </div>
+            )}
 
             {/* Informations personnelles */}
             <div className="bg-white p-6 rounded-lg shadow-sm">

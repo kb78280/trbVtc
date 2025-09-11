@@ -27,15 +27,15 @@ export default function Hero() {
             </a>
             <a
               href="#services"
-              className="text-base font-semibold leading-6 text-white hover:text-blue-100"
+              className="hidden md:block text-base font-semibold leading-6 text-white hover:text-blue-100"
             >
               Découvrir nos services <span aria-hidden="true">→</span>
             </a>
           </div>
         </div>
         
-        {/* Features */}
-        <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-3">
+        {/* Features - Masqué sur mobile, visible sur tablette et desktop */}
+        <div className="hidden md:grid mt-16 grid-cols-1 gap-8 sm:grid-cols-3">
           <div className="text-center">
             <div className="mx-auto h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
