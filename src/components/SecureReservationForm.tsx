@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { reservationSchema } from '@/lib/validation'
 import { CSRFProtection, RateLimiter, SecurityMonitor, HoneypotProtection } from '@/lib/security'
-import AddressAutocomplete from '@/components/AddressAutocomplete'
+import DepartureAutocomplete from '@/components/DepartureAutocomplete'
+import ArrivalAutocomplete from '@/components/ArrivalAutocomplete'
 import InteractiveMap from '@/components/InteractiveMap'
 
 type ServiceType = 'transfert' | 'mise-a-disposition'
@@ -245,22 +246,18 @@ export default function SecureReservationForm() {
                   <label htmlFor="depart" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu de départ *
                   </label>
-                  <AddressAutocomplete
-                    id="depart"
-                    name="depart"
-                    placeholder="Tapez votre adresse de départ..."
+                  <DepartureAutocomplete
                     value={watch('depart') || ''}
                     onChange={(value, placeDetails) => {
-                      console.log('Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
+                      console.log('[FORM] Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
                       setValue('depart', value, { shouldValidate: false, shouldDirty: true })
                       if (placeDetails && placeDetails.geometry) {
                         setOriginPlace(placeDetails)
-                        console.log('Origin place set:', placeDetails.formatted_address)
+                        console.log('[FORM] Origin place set:', placeDetails.formatted_address)
                       } else if (!placeDetails) {
-                        // L'utilisateur tape manuellement, on garde le place précédent si l'adresse est similaire
-                        const currentValue = watch('depart') || ''
+                        // L'utilisateur tape manuellement
                         if (originPlace && !value.includes(originPlace.formatted_address?.split(',')[0] || '')) {
-                          console.log('Clearing origin place because address changed significantly')
+                          console.log('[FORM] Clearing origin place because address changed significantly')
                           setOriginPlace(null)
                         }
                       }
@@ -279,22 +276,18 @@ export default function SecureReservationForm() {
                     <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
                       Lieu d'arrivée *
                     </label>
-                    <AddressAutocomplete
-                      id="arrivee"
-                      name="arrivee"
-                      placeholder="Tapez votre adresse d'arrivée..."
+                    <ArrivalAutocomplete
                       value={watch('arrivee') || ''}
                       onChange={(value, placeDetails) => {
-                        console.log('Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
+                        console.log('[FORM] Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
                         setValue('arrivee', value, { shouldValidate: false, shouldDirty: true })
                         if (placeDetails && placeDetails.geometry) {
                           setDestinationPlace(placeDetails)
-                          console.log('Destination place set:', placeDetails.formatted_address)
+                          console.log('[FORM] Destination place set:', placeDetails.formatted_address)
                         } else if (!placeDetails) {
                           // L'utilisateur tape manuellement
-                          const currentValue = watch('arrivee') || ''
                           if (destinationPlace && !value.includes(destinationPlace.formatted_address?.split(',')[0] || '')) {
-                            console.log('Clearing destination place because address changed significantly')
+                            console.log('[FORM] Clearing destination place because address changed significantly')
                             setDestinationPlace(null)
                           }
                         }
