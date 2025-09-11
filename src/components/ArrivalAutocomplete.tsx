@@ -28,6 +28,7 @@ export default function ArrivalAutocomplete({
   const [error, setError] = useState('')
   const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isSelecting, setIsSelecting] = useState(false) // Protection pendant sélection
   
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
@@ -45,6 +46,7 @@ export default function ArrivalAutocomplete({
           autocompleteRef.current = autocomplete
 
           autocomplete.addListener('place_changed', () => {
+            setIsSelecting(true) // Marquer qu'on est en sélection
             const place = autocomplete.getPlace()
             
             console.log('[ARRIVEE] Place changed:', {
@@ -58,6 +60,7 @@ export default function ArrivalAutocomplete({
               console.warn('[ARRIVEE] Invalid place selected')
               setError('Adresse d\'arrivée non trouvée. Veuillez sélectionner une suggestion.')
               onError?.('Adresse non trouvée')
+              setIsSelecting(false)
               return
             }
 
@@ -72,6 +75,13 @@ export default function ArrivalAutocomplete({
                 inputRef.current.value = formattedAddress
               }
               onChange(formattedAddress, place)
+              
+              // Fin de sélection
+              setTimeout(() => {
+                setIsSelecting(false)
+              }, 100)
+            } else {
+              setIsSelecting(false)
             }
           })
 
@@ -119,16 +129,35 @@ export default function ArrivalAutocomplete({
 
   // Synchroniser avec ce que Google Maps a mis dans l'input
   useEffect(() => {
-    if (inputRef.current) {
+    if (inputRef.current && !isSelecting) {
       const currentInputValue = inputRef.current.value
       console.log('🔵 [ARRIVEE] RENDER - Current input value:', currentInputValue, 'Internal value:', internalValue)
       
-      if (currentInputValue !== internalValue) {
-        console.log('🔵 [ARRIVEE] SYNC DETECTED - Google Maps changed input to:', currentInputValue)
-        console.log('🔵 [ARRIVEE] Updating internalValue from', internalValue, 'to', currentInputValue)
+      if (currentInputValue !== internalValue && currentInputValue.length > internalValue.length) {
+        // Seulement si Google Maps a AJOUTÉ du contenu (autocomplétion)
+        console.log('🔵 [ARRIVEE] GOOGLE AUTOCOMPLETE DETECTED - Input expanded from', internalValue, 'to', currentInputValue)
         setInternalValue(currentInputValue)
-        // Notifier le parent du changement
-        onChange(currentInputValue)
+        
+        // Géocoder l'adresse pour obtenir les placeDetails
+        if (window.google?.maps?.Geocoder) {
+          const geocoder = new window.google.maps.Geocoder()
+          geocoder.geocode({ address: currentInputValue }, (results, status) => {
+            if (status === 'OK' && results && results[0]) {
+              console.log('🔵 [ARRIVEE] GEOCODING SUCCESS for:', currentInputValue)
+              const place = results[0]
+              onChange(currentInputValue, place)
+            } else {
+              console.log('🔵 [ARRIVEE] GEOCODING FAILED for:', currentInputValue)
+              onChange(currentInputValue) // Sans placeDetails
+            }
+          })
+        } else {
+          onChange(currentInputValue) // Sans placeDetails si pas de geocoder
+        }
+      } else if (currentInputValue !== internalValue && currentInputValue.length < internalValue.length) {
+        // Si l'input a été raccourci, on force notre valeur
+        console.log('🔵 [ARRIVEE] INPUT SHORTENED - Forcing back to:', internalValue)
+        inputRef.current.value = internalValue
       }
     }
   })

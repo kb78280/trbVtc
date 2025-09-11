@@ -140,7 +140,23 @@ export default function DepartureAutocomplete({
         // Seulement si Google Maps a AJOUTÉ du contenu (autocomplétion)
         console.log('🟢 [DEPART] GOOGLE AUTOCOMPLETE DETECTED - Input expanded from', internalValue, 'to', currentInputValue)
         setInternalValue(currentInputValue)
-        // Ne PAS appeler onChange ici - on garde les placeDetails du place_changed
+        
+        // Géocoder l'adresse pour obtenir les placeDetails
+        if (window.google?.maps?.Geocoder) {
+          const geocoder = new window.google.maps.Geocoder()
+          geocoder.geocode({ address: currentInputValue }, (results, status) => {
+            if (status === 'OK' && results && results[0]) {
+              console.log('🟢 [DEPART] GEOCODING SUCCESS for:', currentInputValue)
+              const place = results[0]
+              onChange(currentInputValue, place)
+            } else {
+              console.log('🟢 [DEPART] GEOCODING FAILED for:', currentInputValue)
+              onChange(currentInputValue) // Sans placeDetails
+            }
+          })
+        } else {
+          onChange(currentInputValue) // Sans placeDetails si pas de geocoder
+        }
       } else if (currentInputValue !== internalValue && currentInputValue.length < internalValue.length) {
         // Si l'input a été raccourci, on force notre valeur
         console.log('🟢 [DEPART] INPUT SHORTENED - Forcing back to:', internalValue)
