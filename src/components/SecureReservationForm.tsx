@@ -89,6 +89,21 @@ export default function SecureReservationForm() {
       setIsSubmitting(true)
       setSubmitError('')
 
+      // Synchroniser les valeurs d'adresse avec React Hook Form AVANT soumission
+      console.log('[FORM] Syncing addresses before submit:', { departValue, arriveeValue })
+      setValue('depart', departValue)
+      if (serviceType === 'transfert') {
+        setValue('arrivee', arriveeValue)
+      }
+
+      // Validation manuelle des adresses
+      if (!departValue.trim()) {
+        throw new Error('L\'adresse de départ est requise.')
+      }
+      if (serviceType === 'transfert' && !arriveeValue.trim()) {
+        throw new Error('L\'adresse d\'arrivée est requise.')
+      }
+
       // Vérification CSRF
       if (!CSRFProtection.validateToken(csrfToken)) {
         throw new Error('Token CSRF invalide. Veuillez recharger la page.')
@@ -157,7 +172,6 @@ export default function SecureReservationForm() {
     // Réinitialiser les champs d'adresse si on passe à "mise-a-disposition"
     if (type === 'mise-a-disposition') {
       setArriveeValue('')
-      setValue('arrivee', '')
       setDestinationPlace(null)
       setRouteInfo(null)
     }
@@ -258,7 +272,7 @@ export default function SecureReservationForm() {
                     onChange={(value, placeDetails) => {
                       console.log('[FORM] Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
                       setDepartValue(value)
-                      setValue('depart', value, { shouldValidate: false, shouldDirty: true })
+                      // NE PAS utiliser setValue ici - seulement à la soumission
                       if (placeDetails && placeDetails.geometry) {
                         setOriginPlace(placeDetails)
                         console.log('[FORM] Origin place set:', placeDetails.formatted_address)
@@ -270,13 +284,11 @@ export default function SecureReservationForm() {
                         }
                       }
                     }}
-                    className={errors.depart ? 'border-red-500' : ''}
+                    className=""
                     required
                     disabled={rateLimitInfo.blocked || isSubmitting}
                   />
-                  {errors.depart && (
-                    <p className="mt-1 text-sm text-red-600">{errors.depart.message}</p>
-                  )}
+                  {/* Validation manuelle des adresses - pas d'erreurs React Hook Form */}
                 </div>
 
                 {serviceType === 'transfert' && (
@@ -289,7 +301,7 @@ export default function SecureReservationForm() {
                       onChange={(value, placeDetails) => {
                         console.log('[FORM] Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
                         setArriveeValue(value)
-                        setValue('arrivee', value, { shouldValidate: false, shouldDirty: true })
+                        // NE PAS utiliser setValue ici - seulement à la soumission
                         if (placeDetails && placeDetails.geometry) {
                           setDestinationPlace(placeDetails)
                           console.log('[FORM] Destination place set:', placeDetails.formatted_address)
@@ -301,13 +313,11 @@ export default function SecureReservationForm() {
                           }
                         }
                       }}
-                      className={errors.arrivee ? 'border-red-500' : ''}
+                      className=""
                       required
                       disabled={rateLimitInfo.blocked || isSubmitting}
                     />
-                    {errors.arrivee && (
-                      <p className="mt-1 text-sm text-red-600">{errors.arrivee.message}</p>
-                    )}
+                    {/* Validation manuelle des adresses - pas d'erreurs React Hook Form */}
                   </div>
                 )}
 
