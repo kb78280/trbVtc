@@ -603,7 +603,8 @@ export default function SecureReservationForm() {
                       </div>
                       <div className="flex-1">
                         <EtapeAutocomplete
-                          value={etape}
+                          key={`${etapesKey}-${index}`}
+                          value=""
                           onChange={(value, placeDetails) => {
                             console.log('🟡 [PARENT] 📨 ETAPE onChange:', { index, value, hasPlace: !!placeDetails })
                             updateEtape(index, value, placeDetails)

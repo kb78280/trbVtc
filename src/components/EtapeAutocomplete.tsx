@@ -19,7 +19,7 @@ export default function EtapeAutocomplete({
 }: EtapeAutocompleteProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [error, setError] = useState('')
-  const [internalValue, setInternalValue] = useState(value)
+  const [internalValue, setInternalValue] = useState('')
   const [isSelecting, setIsSelecting] = useState(false)
   const [isAutocompleted, setIsAutocompleted] = useState(false)
   
@@ -113,18 +113,17 @@ export default function EtapeAutocomplete({
     }
   })
 
-  // Synchronisation avec la valeur externe
+  // Synchronisation avec la valeur externe (uniquement pour reset)
   useEffect(() => {
-    if (value !== internalValue && !isSelecting) {
-      setInternalValue(value)
+    if (value === '' && internalValue !== '') {
+      console.log('🟡 [ETAPE] RESET externe détecté')
+      setInternalValue('')
+      setIsAutocompleted(false)
       if (inputRef.current) {
-        inputRef.current.value = value
-      }
-      if (value === '') {
-        setIsAutocompleted(false)
+        inputRef.current.value = ''
       }
     }
-  }, [value, internalValue, isSelecting])
+  }, [value]) // Seulement value dans les deps, pas internalValue
 
   return (
     <div className="relative">
