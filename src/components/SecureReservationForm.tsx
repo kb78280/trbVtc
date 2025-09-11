@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { reservationSchema } from '@/lib/validation'
@@ -294,6 +294,20 @@ export default function SecureReservationForm() {
     })
   }
 
+  // Fonction mémorisée pour éviter les re-renders de InteractiveMap
+  const handleRouteCalculated = useCallback((distance: string, duration: string) => {
+    console.log('🗺️ [PARENT] Route calculée:', { distance, duration })
+    setRouteInfo({ distance, duration })
+  }, [])
+
+  // Waypoints mémorisés pour éviter les recalculs inutiles
+  const memoizedValidWaypoints = useMemo(() => {
+    if (serviceType !== 'mise-a-disposition') return []
+    const validPlaces = etapesPlaces.filter(place => place !== null) as google.maps.places.PlaceResult[]
+    console.log('🗺️ [PARENT] Waypoints mémorisés:', validPlaces.map(p => p.formatted_address))
+    return validPlaces
+  }, [serviceType, etapesPlaces])
+
   if (!mounted) {
     return (
       <section id="reservation" className="py-12 bg-gray-50">
@@ -561,11 +575,9 @@ export default function SecureReservationForm() {
                 <InteractiveMap
                   origin={originPlace}
                   destination={destinationPlace || undefined}
-                  validWaypoints={serviceType === 'mise-a-disposition' ? etapesPlaces.filter(place => place !== null) as google.maps.places.PlaceResult[] : []}
+                  validWaypoints={memoizedValidWaypoints}
                   height="300px"
-                  onRouteCalculated={(distance, duration) => {
-                    setRouteInfo({ distance, duration })
-                  }}
+                  onRouteCalculated={handleRouteCalculated}
                 />
                 
                 {routeInfo && (
