@@ -7,6 +7,7 @@ import { reservationSchema } from '@/lib/validation'
 import { CSRFProtection, RateLimiter, SecurityMonitor, HoneypotProtection } from '@/lib/security'
 import DepartureAutocomplete from '@/components/DepartureAutocomplete'
 import ArrivalAutocomplete from '@/components/ArrivalAutocomplete'
+import EtapeAutocomplete from '@/components/EtapeAutocomplete'
 import InteractiveMap from '@/components/InteractiveMap'
 
 type ServiceType = 'transfert' | 'mise-a-disposition'
@@ -431,7 +432,7 @@ export default function SecureReservationForm() {
                 </div>
 
                 <div className={`grid gap-4 ${serviceType === 'mise-a-disposition' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                  <div>
+                  <div className="flex flex-col">
                     <label htmlFor="passagers" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de passagers
                     </label>
@@ -447,12 +448,14 @@ export default function SecureReservationForm() {
                         <option key={num} value={num}>{num} passager{num > 1 ? 's' : ''}</option>
                       ))}
                     </select>
-                    {errors.passagers && (
-                      <p className="mt-1 text-sm text-red-600">{errors.passagers.message}</p>
-                    )}
+                    <div className="mt-1 h-6 flex items-start">
+                      {errors.passagers && (
+                        <p className="text-sm text-red-600">{errors.passagers.message}</p>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
+                  <div className="flex flex-col">
                     <label htmlFor="bagages" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de bagages
                     </label>
@@ -468,13 +471,15 @@ export default function SecureReservationForm() {
                         <option key={num} value={num}>{num} bagage{num > 1 ? 's' : ''}</option>
                       ))}
                     </select>
-                    {errors.bagages && (
-                      <p className="mt-1 text-sm text-red-600">{errors.bagages.message}</p>
-                    )}
+                    <div className="mt-1 h-6 flex items-start">
+                      {errors.bagages && (
+                        <p className="text-sm text-red-600">{errors.bagages.message}</p>
+                      )}
+                    </div>
                   </div>
 
                   {serviceType === 'mise-a-disposition' && (
-                    <div>
+                    <div className="flex flex-col">
                       <label htmlFor="duree" className="block text-sm font-medium text-gray-700 mb-1">
                         Durée (heures)
                       </label>
@@ -490,11 +495,11 @@ export default function SecureReservationForm() {
                           <option key={num} value={num}>{num} heure{num > 1 ? 's' : ''}</option>
                         ))}
                       </select>
-                      {errors.duree && (
-                        <p className="mt-1 text-sm text-red-600">{errors.duree.message}</p>
-                      )}
-                      {/* Ligne vide pour l'alignement */}
-                      {!errors.duree && <div className="mt-1 h-6"></div>}
+                      <div className="mt-1 h-6 flex items-start">
+                        {errors.duree && (
+                          <p className="text-sm text-red-600">{errors.duree.message}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -549,12 +554,14 @@ export default function SecureReservationForm() {
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <input
-                          type="text"
+                        <EtapeAutocomplete
                           value={etape}
-                          onChange={(e) => updateEtape(index, e.target.value)}
+                          onChange={(value, placeDetails) => {
+                            console.log('🟡 [PARENT] 📨 ETAPE onChange:', { index, value, hasPlace: !!placeDetails })
+                            updateEtape(index, value)
+                            // Optionnel : stocker les placeDetails pour chaque étape si nécessaire
+                          }}
                           placeholder={`Étape ${index + 1} (optionnel)`}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
                           disabled={rateLimitInfo.blocked || isSubmitting}
                         />
                       </div>
@@ -579,7 +586,7 @@ export default function SecureReservationForm() {
                       disabled={rateLimitInfo.blocked || isSubmitting}
                     >
                       <span className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-sm">+</span>
-                      Ajouter une étape ({etapes.length}/10)
+                      Ajouter une étape
                     </button>
                   )}
                 </div>
