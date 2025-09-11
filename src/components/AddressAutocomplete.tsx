@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader } from '@googlemaps/js-api-loader'
+import { googleMapsService } from '@/lib/googleMaps'
 
 interface AddressAutocompleteProps {
   id: string
@@ -34,36 +34,12 @@ export default function AddressAutocomplete({
   useEffect(() => {
     const initializeAutocomplete = async () => {
       try {
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        
-        if (!apiKey) {
-          throw new Error('Clé API Google Maps manquante')
-        }
-
-        const loader = new Loader({
-          apiKey,
-          version: 'weekly',
-          libraries: ['places'],
-          language: 'fr',
-          region: 'FR'
-        })
-
-        await loader.load()
+        // Utiliser le service centralisé
+        await googleMapsService.loadGoogleMaps()
 
         if (inputRef.current) {
-          // Configuration de l'autocomplétion
-          const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-            componentRestrictions: { country: 'fr' }, // Limiter à la France
-            fields: [
-              'address_components',
-              'formatted_address',
-              'geometry',
-              'name',
-              'place_id'
-            ],
-            types: ['address'] // Seulement les adresses
-          })
-
+          // Créer l'autocomplétion via le service
+          const autocomplete = googleMapsService.createAutocomplete(inputRef.current)
           autocompleteRef.current = autocomplete
 
           // Écouter les sélections d'adresse
@@ -94,7 +70,7 @@ export default function AddressAutocomplete({
 
     // Nettoyage
     return () => {
-      if (autocompleteRef.current) {
+      if (autocompleteRef.current && googleMapsService.isGoogleMapsLoaded()) {
         google.maps.event.clearInstanceListeners(autocompleteRef.current)
       }
     }

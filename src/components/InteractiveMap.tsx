@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader } from '@googlemaps/js-api-loader'
+import { googleMapsService } from '@/lib/googleMaps'
 
 interface InteractiveMapProps {
   origin?: google.maps.places.PlaceResult
@@ -28,49 +28,17 @@ export default function InteractiveMap({
   useEffect(() => {
     const initializeMap = async () => {
       try {
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        
-        if (!apiKey) {
-          throw new Error('Clé API Google Maps manquante')
-        }
-
-        const loader = new Loader({
-          apiKey,
-          version: 'weekly',
-          libraries: ['places', 'geometry'],
-          language: 'fr',
-          region: 'FR'
-        })
-
-        await loader.load()
+        // Utiliser le service centralisé
+        await googleMapsService.loadGoogleMaps()
 
         if (mapRef.current) {
-          // Initialiser la carte centrée sur Paris
-          const map = new google.maps.Map(mapRef.current, {
-            zoom: 12,
-            center: { lat: 48.8566, lng: 2.3522 }, // Paris
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
-            styles: [
-              {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }]
-              }
-            ]
-          })
-
+          // Créer la carte via le service
+          const map = googleMapsService.createMap(mapRef.current)
           mapInstanceRef.current = map
-          directionsServiceRef.current = new google.maps.DirectionsService()
-          directionsRendererRef.current = new google.maps.DirectionsRenderer({
-            suppressMarkers: false,
-            polylineOptions: {
-              strokeColor: '#2563eb', // Bleu
-              strokeWeight: 4,
-              strokeOpacity: 0.8
-            }
-          })
+
+          // Créer les services de directions via le service centralisé
+          directionsServiceRef.current = googleMapsService.createDirectionsService()
+          directionsRendererRef.current = googleMapsService.createDirectionsRenderer()
 
           directionsRendererRef.current.setMap(map)
           setIsLoaded(true)
