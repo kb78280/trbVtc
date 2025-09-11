@@ -47,6 +47,23 @@ export default function SecureReservationForm() {
   const [departValue, setDepartValue] = useState('')
   const [arriveeValue, setArriveeValue] = useState('')
 
+  // Debug: Log des changements d'états
+  useEffect(() => {
+    console.log('[DEBUG] State change - departValue:', departValue)
+  }, [departValue])
+
+  useEffect(() => {
+    console.log('[DEBUG] State change - arriveeValue:', arriveeValue)
+  }, [arriveeValue])
+
+  useEffect(() => {
+    console.log('[DEBUG] State change - originPlace:', originPlace?.formatted_address || 'null')
+  }, [originPlace])
+
+  useEffect(() => {
+    console.log('[DEBUG] State change - destinationPlace:', destinationPlace?.formatted_address || 'null')
+  }, [destinationPlace])
+
   const honeypot = HoneypotProtection.createHoneypot()
 
   const {
@@ -270,16 +287,23 @@ export default function SecureReservationForm() {
                   <DepartureAutocomplete
                     value={departValue}
                     onChange={(value, placeDetails) => {
-                      console.log('[FORM] Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
+                      console.log('🟢 [FORM] Départ onChange:', {
+                        value,
+                        hasPlaceDetails: !!placeDetails,
+                        placeAddress: placeDetails?.formatted_address,
+                        currentDepartValue: departValue,
+                        currentOriginPlace: originPlace?.formatted_address
+                      })
                       setDepartValue(value)
                       // NE PAS utiliser setValue ici - seulement à la soumission
                       if (placeDetails && placeDetails.geometry) {
+                        console.log('🟢 [FORM] Setting origin place:', placeDetails.formatted_address)
                         setOriginPlace(placeDetails)
-                        console.log('[FORM] Origin place set:', placeDetails.formatted_address)
                       } else if (!placeDetails) {
                         // L'utilisateur tape manuellement
+                        console.log('🟡 [FORM] Manual typing, checking if should clear origin place')
                         if (originPlace && !value.includes(originPlace.formatted_address?.split(',')[0] || '')) {
-                          console.log('[FORM] Clearing origin place because address changed significantly')
+                          console.log('🔴 [FORM] Clearing origin place because address changed significantly')
                           setOriginPlace(null)
                         }
                       }
@@ -299,16 +323,25 @@ export default function SecureReservationForm() {
                     <ArrivalAutocomplete
                       value={arriveeValue}
                       onChange={(value, placeDetails) => {
-                        console.log('[FORM] Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
+                        console.log('🔵 [FORM] Arrivée onChange:', {
+                          value,
+                          hasPlaceDetails: !!placeDetails,
+                          placeAddress: placeDetails?.formatted_address,
+                          currentArriveeValue: arriveeValue,
+                          currentDestinationPlace: destinationPlace?.formatted_address,
+                          currentDepartValue: departValue,
+                          currentOriginPlace: originPlace?.formatted_address
+                        })
                         setArriveeValue(value)
                         // NE PAS utiliser setValue ici - seulement à la soumission
                         if (placeDetails && placeDetails.geometry) {
+                          console.log('🔵 [FORM] Setting destination place:', placeDetails.formatted_address)
                           setDestinationPlace(placeDetails)
-                          console.log('[FORM] Destination place set:', placeDetails.formatted_address)
                         } else if (!placeDetails) {
                           // L'utilisateur tape manuellement
+                          console.log('🟡 [FORM] Manual typing arrivée, checking if should clear destination place')
                           if (destinationPlace && !value.includes(destinationPlace.formatted_address?.split(',')[0] || '')) {
-                            console.log('[FORM] Clearing destination place because address changed significantly')
+                            console.log('🔴 [FORM] Clearing destination place because address changed significantly')
                             setDestinationPlace(null)
                           }
                         }

@@ -28,11 +28,18 @@ export default function ArrivalAutocomplete({
 
   // Synchroniser UNIQUEMENT à l'initialisation et lors de reset externe
   useEffect(() => {
+    console.log('🔵 [ARRIVEE] External value changed:', {
+      externalValue: value,
+      internalValue,
+      willReset: value === '' && internalValue !== '',
+      willInit: value !== '' && internalValue === '' && value !== internalValue
+    })
+    
     if (value === '' && internalValue !== '') {
-      console.log('[ARRIVEE] External reset detected, clearing internal value')
+      console.log('🔴 [ARRIVEE] External reset detected, clearing internal value')
       setInternalValue('')
     } else if (value !== '' && internalValue === '' && value !== internalValue) {
-      console.log('[ARRIVEE] Initial value set from external:', value)
+      console.log('🔵 [ARRIVEE] Initial value set from external:', value)
       setInternalValue(value)
     }
   }, [value])
@@ -94,7 +101,12 @@ export default function ArrivalAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('[ARRIVEE] Input change:', newValue)
+    console.log('🔵 [ARRIVEE] Input change:', {
+      newValue,
+      currentInternalValue: internalValue,
+      currentExternalValue: value,
+      willCallOnChange: true
+    })
     setInternalValue(newValue)
     onChange(newValue)
     

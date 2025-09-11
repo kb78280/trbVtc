@@ -28,11 +28,18 @@ export default function DepartureAutocomplete({
 
   // Synchroniser UNIQUEMENT à l'initialisation et lors de reset externe
   useEffect(() => {
+    console.log('🟢 [DEPART] External value changed:', {
+      externalValue: value,
+      internalValue,
+      willReset: value === '' && internalValue !== '',
+      willInit: value !== '' && internalValue === '' && value !== internalValue
+    })
+    
     if (value === '' && internalValue !== '') {
-      console.log('[DEPART] External reset detected, clearing internal value')
+      console.log('🔴 [DEPART] External reset detected, clearing internal value')
       setInternalValue('')
     } else if (value !== '' && internalValue === '' && value !== internalValue) {
-      console.log('[DEPART] Initial value set from external:', value)
+      console.log('🟢 [DEPART] Initial value set from external:', value)
       setInternalValue(value)
     }
   }, [value])
@@ -94,7 +101,12 @@ export default function DepartureAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('[DEPART] Input change:', newValue)
+    console.log('🟢 [DEPART] Input change:', {
+      newValue,
+      currentInternalValue: internalValue,
+      currentExternalValue: value,
+      willCallOnChange: true
+    })
     setInternalValue(newValue)
     onChange(newValue)
     
