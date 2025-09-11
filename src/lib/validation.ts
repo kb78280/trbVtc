@@ -47,7 +47,11 @@ export const reservationSchema = z.object({
   passagers: z
     .union([z.string(), z.number()])
     .transform((val) => typeof val === 'string' ? parseInt(val) : val)
-    .refine((n) => n >= 1 && n <= 8, 'Le nombre de passagers doit être entre 1 et 8'),
+    .refine((n) => n >= 1 && n <= 3, 'Le nombre de passagers doit être entre 1 et 3'),
+  bagages: z
+    .union([z.string(), z.number()])
+    .transform((val) => typeof val === 'string' ? parseInt(val) : val)
+    .refine((n) => n >= 0 && n <= 3, 'Le nombre de bagages doit être entre 0 et 3'),
   duree: z
     .union([z.string(), z.number()])
     .transform((val) => typeof val === 'string' ? parseInt(val) : val)

@@ -19,6 +19,7 @@ type FormData = {
   date: string
   heure: string
   passagers: string
+  bagages: string
   duree?: string
   prenom: string
   nom: string
@@ -90,6 +91,7 @@ export default function SecureReservationForm() {
     defaultValues: {
       serviceType: 'transfert',
       passagers: '1',
+      bagages: '0',
       duree: '2'
     }
   })
@@ -399,7 +401,7 @@ export default function SecureReservationForm() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${serviceType === 'mise-a-disposition' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <div>
                     <label htmlFor="passagers" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de passagers
@@ -412,12 +414,33 @@ export default function SecureReservationForm() {
                       }`}
                       disabled={rateLimitInfo.blocked || isSubmitting}
                     >
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                      {[1, 2, 3].map(num => (
                         <option key={num} value={num}>{num} passager{num > 1 ? 's' : ''}</option>
                       ))}
                     </select>
                     {errors.passagers && (
                       <p className="mt-1 text-sm text-red-600">{errors.passagers.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="bagages" className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre de bagages
+                    </label>
+                    <select
+                      {...register('bagages')}
+                      id="bagages"
+                      className={`w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 ${
+                        errors.bagages ? 'border-red-500' : ''
+                      }`}
+                      disabled={rateLimitInfo.blocked || isSubmitting}
+                    >
+                      {[0, 1, 2, 3].map(num => (
+                        <option key={num} value={num}>{num} bagage{num > 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                    {errors.bagages && (
+                      <p className="mt-1 text-sm text-red-600">{errors.bagages.message}</p>
                     )}
                   </div>
 
