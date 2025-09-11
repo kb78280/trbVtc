@@ -533,14 +533,17 @@ export default function SecureReservationForm() {
               </div>
             </div>
 
-            {/* Carte interactive - Affichée seulement si on a les deux adresses pour un transfert */}
+            {/* Carte interactive - Affichée dès qu'au moins une adresse est autocompletée */}
             {(isDepartAutocompleted || isArriveeAutocompleted) && originPlace && (
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Aperçu de votre trajet</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  {serviceType === 'transfert' ? 'Aperçu de votre trajet' : 'Aperçu de votre service'}
+                </h3>
                 
                 <InteractiveMap
                   origin={originPlace}
-                  destination={serviceType === 'transfert' ? destinationPlace || undefined : undefined}
+                  destination={destinationPlace || undefined}
+                  waypoints={serviceType === 'mise-a-disposition' ? etapes.filter(etape => etape.trim() !== '') : []}
                   height="300px"
                   onRouteCalculated={(distance, duration) => {
                     setRouteInfo({ distance, duration })

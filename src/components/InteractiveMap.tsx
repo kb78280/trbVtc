@@ -6,6 +6,7 @@ import { googleMapsService } from '@/lib/googleMaps'
 interface InteractiveMapProps {
   origin?: google.maps.places.PlaceResult
   destination?: google.maps.places.PlaceResult
+  waypoints?: string[] // Étapes intermédiaires (adresses texte)
   height?: string
   className?: string
   onRouteCalculated?: (distance: string, duration: string) => void
@@ -14,6 +15,7 @@ interface InteractiveMapProps {
 export default function InteractiveMap({
   origin,
   destination,
+  waypoints = [],
   height = '400px',
   className = '',
   onRouteCalculated
@@ -61,9 +63,25 @@ export default function InteractiveMap({
 
     const calculateRoute = async () => {
       try {
+        // Construire les waypoints à partir des étapes
+        const waypointsFormatted: google.maps.DirectionsWaypoint[] = waypoints
+          .filter(waypoint => waypoint.trim() !== '') // Filtrer les étapes vides
+          .map(waypoint => ({
+            location: waypoint,
+            stopover: true
+          }))
+
+        console.log('🗺️ [MAP] Calcul route avec waypoints:', { 
+          origin: origin.formatted_address, 
+          destination: destination.formatted_address,
+          waypoints: waypointsFormatted.map(w => w.location)
+        })
+
         const request: google.maps.DirectionsRequest = {
           origin: origin.geometry!.location!,
           destination: destination.geometry!.location!,
+          waypoints: waypointsFormatted,
+          optimizeWaypoints: true, // Optimiser l'ordre des waypoints
           travelMode: google.maps.TravelMode.DRIVING,
           avoidHighways: false,
           avoidTolls: false,
@@ -93,7 +111,7 @@ export default function InteractiveMap({
     }
 
     calculateRoute()
-  }, [isLoaded, origin, destination, onRouteCalculated])
+  }, [isLoaded, origin, destination, waypoints, onRouteCalculated])
 
   if (error) {
     return (
