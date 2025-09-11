@@ -98,6 +98,9 @@ export const reservationSchema = z.object({
     .union([z.string(), z.boolean()])
     .transform((val) => typeof val === 'string' ? val === 'true' : val)
     .optional(),
+  methodePaiement: z
+    .enum(['immediate', 'sur-place'])
+    .optional(),
   etapes: z
     .array(z.string().transform(sanitizeInput))
     .max(10, 'Maximum 10 étapes autorisées')
