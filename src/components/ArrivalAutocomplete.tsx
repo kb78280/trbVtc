@@ -26,12 +26,14 @@ export default function ArrivalAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  // Synchroniser avec la valeur externe
+  // Synchroniser avec la valeur externe seulement si elle est différente
+  // et qu'elle ne vient pas de notre propre onChange
   useEffect(() => {
-    if (value !== internalValue) {
+    if (value !== internalValue && value !== '') {
+      console.log('[ARRIVEE] External value changed from', internalValue, 'to', value)
       setInternalValue(value)
     }
-  }, [value])
+  }, [value, internalValue])
 
   useEffect(() => {
     const initializeAutocomplete = async () => {
