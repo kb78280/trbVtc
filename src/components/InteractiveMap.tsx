@@ -73,11 +73,13 @@ export default function InteractiveMap({
             stopover: true
           }))
 
-        console.log('🗺️ [MAP] Calcul route avec waypoints validés:', { 
+        const routeId = Math.random().toString(36).substring(7)
+        console.log(`🗺️ [MAP] [${routeId}] DÉBUT calcul route:`, { 
           origin: origin.formatted_address, 
           destination: destination?.formatted_address || 'undefined',
           validWaypoints: validWaypoints.map(w => w.formatted_address),
-          waypointsCount: waypointsFormatted.length
+          waypointsCount: waypointsFormatted.length,
+          timestamp: new Date().toISOString()
         })
 
         const request: google.maps.DirectionsRequest = {
@@ -102,6 +104,7 @@ export default function InteractiveMap({
           const distance = leg.distance?.text || 'N/A'
           const duration = leg.duration?.text || 'N/A'
           
+          console.log(`🗺️ [MAP] [${routeId}] FIN calcul - Appel onRouteCalculated:`, { distance, duration })
           onRouteCalculated?.(distance, duration)
         }
 
@@ -113,6 +116,16 @@ export default function InteractiveMap({
       }
     }
 
+    const effectId = Math.random().toString(36).substring(7)
+    console.log(`🔄 [MAP] [${effectId}] useEffect DÉCLENCHÉ:`, {
+      isLoaded,
+      hasOrigin: !!origin,
+      hasDestination: !!destination,
+      waypointsCount: validWaypoints.length,
+      onRouteCalculatedType: typeof onRouteCalculated
+    })
+    
+    console.log(`🔄 [MAP] [${effectId}] APPEL calculateRoute()`)
     calculateRoute()
   }, [isLoaded, origin, destination, validWaypoints, onRouteCalculated])
 

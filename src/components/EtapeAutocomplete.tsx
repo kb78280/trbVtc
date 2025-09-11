@@ -113,7 +113,7 @@ export default function EtapeAutocomplete({
     }
   })
 
-  // Synchronisation avec la valeur externe (uniquement pour reset)
+  // Synchronisation avec la valeur externe
   useEffect(() => {
     if (value === '' && internalValue !== '') {
       console.log('🟡 [ETAPE] RESET externe détecté')
@@ -121,6 +121,12 @@ export default function EtapeAutocomplete({
       setIsAutocompleted(false)
       if (inputRef.current) {
         inputRef.current.value = ''
+      }
+    } else if (value !== '' && value !== internalValue) {
+      console.log('🟡 [ETAPE] SYNC externe:', { value, internalValue })
+      setInternalValue(value)
+      if (inputRef.current) {
+        inputRef.current.value = value
       }
     }
   }, [value]) // Seulement value dans les deps, pas internalValue
