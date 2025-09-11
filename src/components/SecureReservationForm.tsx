@@ -316,13 +316,16 @@ export default function SecureReservationForm() {
     setRouteInfo({ distance, duration })
   }, [])
 
+  // Tableau vide stable pour éviter les re-renders
+  const emptyWaypoints = useMemo(() => [], [])
+  
   // Waypoints mémorisés pour éviter les recalculs inutiles
   const memoizedValidWaypoints = useMemo(() => {
     console.log('🗺️ [PARENT] RECALCUL waypoints - serviceType:', serviceType)
     
     if (serviceType !== 'mise-a-disposition') {
-      console.log('🗺️ [PARENT] Pas de waypoints (service transfert)')
-      return []
+      console.log('🗺️ [PARENT] Pas de waypoints (service transfert) - Retour tableau stable')
+      return emptyWaypoints
     }
     
     console.log('🗺️ [PARENT] ANALYSE etapesPlaces:', {
@@ -343,11 +346,13 @@ export default function SecureReservationForm() {
       totalEtapes: etapesPlaces.length,
       nonNullPlaces: etapesPlaces.filter(p => p !== null).length,
       validPlacesWithGeometry: validPlaces.length,
-      addresses: validPlaces.map(p => p.formatted_address)
+      addresses: validPlaces.map(p => p.formatted_address),
+      willReturnEmptyArray: validPlaces.length === 0
     })
     
-    return validPlaces
-  }, [serviceType, etapesPlaces])
+    // Retourner le tableau stable si aucun waypoint valide
+    return validPlaces.length === 0 ? emptyWaypoints : validPlaces
+  }, [serviceType, etapesPlaces, emptyWaypoints])
 
   if (!mounted) {
     return (

@@ -109,7 +109,12 @@ export default function EtapeAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('🟡 [ETAPE] 👤 USER TYPING:', newValue)
+    console.log('🟡 [ETAPE] 👤 USER TYPING:', {
+      newValue,
+      isLoaded,
+      hasAutocomplete: !!autocompleteRef.current,
+      autocompleteService: !!window.google?.maps?.places?.AutocompleteService
+    })
     
     setInternalValue(newValue)
     setIsAutocompleted(false)
