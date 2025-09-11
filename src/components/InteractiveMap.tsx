@@ -7,6 +7,7 @@ interface InteractiveMapProps {
   origin?: google.maps.places.PlaceResult
   destination?: google.maps.places.PlaceResult
   waypoints?: string[] // Étapes intermédiaires (adresses texte)
+  validWaypoints?: google.maps.places.PlaceResult[] // Étapes validées avec géométrie
   height?: string
   className?: string
   onRouteCalculated?: (distance: string, duration: string) => void
@@ -16,6 +17,7 @@ export default function InteractiveMap({
   origin,
   destination,
   waypoints = [],
+  validWaypoints = [],
   height = '400px',
   className = '',
   onRouteCalculated
@@ -63,18 +65,19 @@ export default function InteractiveMap({
 
     const calculateRoute = async () => {
       try {
-        // Construire les waypoints à partir des étapes
-        const waypointsFormatted: google.maps.DirectionsWaypoint[] = waypoints
-          .filter(waypoint => waypoint.trim() !== '') // Filtrer les étapes vides
+        // Construire les waypoints à partir des étapes validées avec géométrie
+        const waypointsFormatted: google.maps.DirectionsWaypoint[] = validWaypoints
+          .filter(waypoint => waypoint.geometry && waypoint.geometry.location) // Seuls les waypoints avec géométrie
           .map(waypoint => ({
-            location: waypoint,
+            location: waypoint.geometry!.location!,
             stopover: true
           }))
 
-        console.log('🗺️ [MAP] Calcul route avec waypoints:', { 
+        console.log('🗺️ [MAP] Calcul route avec waypoints validés:', { 
           origin: origin.formatted_address, 
-          destination: destination.formatted_address,
-          waypoints: waypointsFormatted.map(w => w.location)
+          destination: destination?.formatted_address || 'undefined',
+          validWaypoints: validWaypoints.map(w => w.formatted_address),
+          waypointsCount: waypointsFormatted.length
         })
 
         const request: google.maps.DirectionsRequest = {
@@ -111,7 +114,7 @@ export default function InteractiveMap({
     }
 
     calculateRoute()
-  }, [isLoaded, origin, destination, waypoints, onRouteCalculated])
+  }, [isLoaded, origin, destination, validWaypoints, onRouteCalculated])
 
   if (error) {
     return (

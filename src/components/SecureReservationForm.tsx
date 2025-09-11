@@ -56,6 +56,7 @@ export default function SecureReservationForm() {
   
   // État pour les étapes (mise-à-disposition uniquement)
   const [etapes, setEtapes] = useState<string[]>([''])
+  const [etapesPlaces, setEtapesPlaces] = useState<(google.maps.places.PlaceResult | null)[]>([null])
   
   // Clés pour forcer le re-render des composants d'autocomplétion
   const [departKey, setDepartKey] = useState(0)
@@ -203,6 +204,7 @@ export default function SecureReservationForm() {
       setDestinationPlace(null)
       setRouteInfo(null)
       setEtapes([''])
+      setEtapesPlaces([null])
       
       // Générer un nouveau token CSRF
       const newToken = CSRFProtection.setToken()
@@ -238,6 +240,7 @@ export default function SecureReservationForm() {
     
     // Reset des étapes
     setEtapes([''])
+    setEtapesPlaces([null])
     
     // Forcer le re-render des composants d'autocomplétion
     setDepartKey(prev => prev + 1)
@@ -260,20 +263,35 @@ export default function SecureReservationForm() {
   const addEtape = () => {
     if (etapes.length < 10) {
       setEtapes([...etapes, ''])
+      setEtapesPlaces([...etapesPlaces, null])
     }
   }
 
   const removeEtape = (index: number) => {
     if (etapes.length > 1) {
       const newEtapes = etapes.filter((_, i) => i !== index)
+      const newEtapesPlaces = etapesPlaces.filter((_, i) => i !== index)
       setEtapes(newEtapes)
+      setEtapesPlaces(newEtapesPlaces)
     }
   }
 
-  const updateEtape = (index: number, value: string) => {
+  const updateEtape = (index: number, value: string, placeDetails?: google.maps.places.PlaceResult) => {
     const newEtapes = [...etapes]
+    const newEtapesPlaces = [...etapesPlaces]
+    
     newEtapes[index] = value
+    newEtapesPlaces[index] = placeDetails || null
+    
     setEtapes(newEtapes)
+    setEtapesPlaces(newEtapesPlaces)
+    
+    console.log('🟡 [ETAPES] Updated:', { 
+      index, 
+      value, 
+      hasPlace: !!placeDetails,
+      totalValidPlaces: newEtapesPlaces.filter(p => p !== null).length
+    })
   }
 
   if (!mounted) {
@@ -543,7 +561,7 @@ export default function SecureReservationForm() {
                 <InteractiveMap
                   origin={originPlace}
                   destination={destinationPlace || undefined}
-                  waypoints={serviceType === 'mise-a-disposition' ? etapes.filter(etape => etape.trim() !== '') : []}
+                  validWaypoints={serviceType === 'mise-a-disposition' ? etapesPlaces.filter(place => place !== null) as google.maps.places.PlaceResult[] : []}
                   height="300px"
                   onRouteCalculated={(distance, duration) => {
                     setRouteInfo({ distance, duration })
@@ -588,8 +606,7 @@ export default function SecureReservationForm() {
                           value={etape}
                           onChange={(value, placeDetails) => {
                             console.log('🟡 [PARENT] 📨 ETAPE onChange:', { index, value, hasPlace: !!placeDetails })
-                            updateEtape(index, value)
-                            // Optionnel : stocker les placeDetails pour chaque étape si nécessaire
+                            updateEtape(index, value, placeDetails)
                           }}
                           placeholder={`Étape ${index + 1} (optionnel)`}
                           disabled={rateLimitInfo.blocked || isSubmitting}
