@@ -32,9 +32,20 @@ export default function DepartureAutocomplete({
     if (value === '' && internalValue !== '') {
       console.log('🔴 [DEPART] External reset detected, clearing internal value')
       setInternalValue('')
+      if (inputRef.current) {
+        inputRef.current.value = ''
+      }
     }
     // Plus de synchronisation pour les autres cas - évite les boucles
   }, [value === '']) // Dépendance sur le booléen, pas sur value directement
+
+  // S'assurer que l'input HTML reflète l'état interne
+  useEffect(() => {
+    if (inputRef.current && inputRef.current.value !== internalValue) {
+      console.log('🟢 [DEPART] Syncing input HTML with internal value:', internalValue)
+      inputRef.current.value = internalValue
+    }
+  }, [internalValue])
 
   useEffect(() => {
     const initializeAutocomplete = async () => {
@@ -68,6 +79,10 @@ export default function DepartureAutocomplete({
             if (formattedAddress) {
               console.log('[DEPART] Valid address selected:', formattedAddress)
               setInternalValue(formattedAddress)
+              // Forcer la mise à jour de l'input HTML aussi
+              if (inputRef.current) {
+                inputRef.current.value = formattedAddress
+              }
               onChange(formattedAddress, place)
             }
           })
