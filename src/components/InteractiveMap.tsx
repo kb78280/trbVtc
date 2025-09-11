@@ -128,20 +128,28 @@ export default function InteractiveMap({
       waypointsAddresses: validWaypoints.map(w => w.formatted_address)
     })
     
-    // DIAGNOSTIC: Vérifier si les références changent
-    const windowDebug = window as any
-    console.log(`🔄 [MAP] [${effectId}] REFS CHECK:`, {
-      originRef: origin === windowDebug.lastOrigin ? 'SAME' : 'DIFFERENT',
-      destinationRef: destination === windowDebug.lastDestination ? 'SAME' : 'DIFFERENT', 
-      waypointsRef: validWaypoints === windowDebug.lastValidWaypoints ? 'SAME' : 'DIFFERENT',
-      callbackRef: onRouteCalculated === windowDebug.lastOnRouteCalculated ? 'SAME' : 'DIFFERENT'
-    })
-    
-    // Stocker les références pour comparaison
-    windowDebug.lastOrigin = origin
-    windowDebug.lastDestination = destination  
-    windowDebug.lastValidWaypoints = validWaypoints
-    windowDebug.lastOnRouteCalculated = onRouteCalculated
+    // DIAGNOSTIC: Vérifier si les références changent (développement seulement)
+    if (process.env.NODE_ENV === 'development') {
+      const windowWithDebug = window as Window & {
+        lastOrigin?: google.maps.places.PlaceResult
+        lastDestination?: google.maps.places.PlaceResult
+        lastValidWaypoints?: google.maps.places.PlaceResult[]
+        lastOnRouteCalculated?: (distance: string, duration: string) => void
+      }
+      
+      console.log(`🔄 [MAP] [${effectId}] REFS CHECK:`, {
+        originRef: origin === windowWithDebug.lastOrigin ? 'SAME' : 'DIFFERENT',
+        destinationRef: destination === windowWithDebug.lastDestination ? 'SAME' : 'DIFFERENT', 
+        waypointsRef: validWaypoints === windowWithDebug.lastValidWaypoints ? 'SAME' : 'DIFFERENT',
+        callbackRef: onRouteCalculated === windowWithDebug.lastOnRouteCalculated ? 'SAME' : 'DIFFERENT'
+      })
+      
+      // Stocker les références pour comparaison
+      windowWithDebug.lastOrigin = origin
+      windowWithDebug.lastDestination = destination  
+      windowWithDebug.lastValidWaypoints = validWaypoints
+      windowWithDebug.lastOnRouteCalculated = onRouteCalculated
+    }
     
     console.log(`🔄 [MAP] [${effectId}] APPEL calculateRoute()`)
     calculateRoute()
