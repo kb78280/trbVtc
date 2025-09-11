@@ -23,6 +23,7 @@ const phoneRegex = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/
 // Schémas de validation Zod
 export const reservationSchema = z.object({
   serviceType: z.enum(['transfert', 'mise-a-disposition']),
+  vehicleType: z.enum(['confort', 'van']),
   depart: z
     .string()
     .min(3, 'Le lieu de départ doit contenir au moins 3 caractères')
@@ -47,7 +48,7 @@ export const reservationSchema = z.object({
   passagers: z
     .union([z.string(), z.number()])
     .transform((val) => typeof val === 'string' ? parseInt(val) : val)
-    .refine((n) => n >= 1 && n <= 3, 'Le nombre de passagers doit être entre 1 et 3'),
+    .refine((n) => n >= 1 && n <= 8, 'Le nombre de passagers doit être entre 1 et 8'),
   bagages: z
     .union([z.string(), z.number()])
     .transform((val) => typeof val === 'string' ? parseInt(val) : val)
@@ -83,10 +84,34 @@ export const reservationSchema = z.object({
     .max(500, 'Les commentaires ne peuvent pas dépasser 500 caractères')
     .transform(sanitizeInput)
     .optional(),
+  // Options facultatives
+  siegeEnfant: z
+    .union([z.string(), z.number()])
+    .transform((val) => typeof val === 'string' ? parseInt(val) : val)
+    .refine((n) => n >= 0 && n <= 5, 'Le nombre de sièges enfant doit être entre 0 et 5')
+    .optional(),
+  bouquetFleurs: z
+    .union([z.string(), z.boolean()])
+    .transform((val) => typeof val === 'string' ? val === 'true' : val)
+    .optional(),
+  assistanceAeroport: z
+    .union([z.string(), z.boolean()])
+    .transform((val) => typeof val === 'string' ? val === 'true' : val)
+    .optional(),
   etapes: z
     .array(z.string().transform(sanitizeInput))
     .max(10, 'Maximum 10 étapes autorisées')
     .optional()
+}).superRefine((data, ctx) => {
+  // Validation conditionnelle des passagers selon le type de véhicule
+  const maxPassagers = data.vehicleType === 'van' ? 8 : 3
+  if (data.passagers > maxPassagers) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Le véhicule ${data.vehicleType === 'van' ? 'Van' : 'Confort'} peut accueillir maximum ${maxPassagers} passagers`,
+      path: ['passagers']
+    })
+  }
 })
 
 export const contactSchema = z.object({

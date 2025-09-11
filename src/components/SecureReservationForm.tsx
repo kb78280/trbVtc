@@ -11,10 +11,12 @@ import EtapeAutocomplete from '@/components/EtapeAutocomplete'
 import InteractiveMap from '@/components/InteractiveMap'
 
 type ServiceType = 'transfert' | 'mise-a-disposition'
+type VehicleType = 'confort' | 'van'
 
 // Type pour le formulaire (avant transformation)
 type FormData = {
   serviceType: ServiceType
+  vehicleType: VehicleType
   depart: string
   arrivee: string
   date: string
@@ -28,11 +30,16 @@ type FormData = {
   email: string
   commentaires?: string
   etapes?: string[]
+  // Options facultatives
+  siegeEnfant?: string
+  bouquetFleurs?: boolean
+  assistanceAeroport?: boolean
 }
 
 export default function SecureReservationForm() {
   const [mounted, setMounted] = useState(false)
   const [serviceType, setServiceType] = useState<ServiceType>('transfert')
+  const [vehicleType, setVehicleType] = useState<VehicleType>('confort')
   const [csrfToken, setCsrfToken] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -102,9 +109,13 @@ export default function SecureReservationForm() {
   } = useForm<FormData>({
     defaultValues: {
       serviceType: 'transfert',
+      vehicleType: 'confort',
       passagers: '1',
       bagages: '0',
-      duree: '2'
+      duree: '2',
+      siegeEnfant: '0',
+      bouquetFleurs: false,
+      assistanceAeroport: false
     }
   })
 
@@ -260,6 +271,38 @@ export default function SecureReservationForm() {
     // Définir le nouveau type
     setServiceType(type)
     setValue('serviceType', type)
+  }
+
+  const handleVehicleTypeChange = (type: VehicleType) => {
+    setVehicleType(type)
+    setValue('vehicleType', type)
+    
+    // Adapter le nombre de passagers selon le véhicule
+    const maxPassagers = type === 'van' ? 8 : 3
+    const currentPassagers = watch('passagers')
+    
+    // Si le nombre actuel dépasse la limite, l'ajuster
+    if (currentPassagers && parseInt(currentPassagers) > maxPassagers) {
+      setValue('passagers', maxPassagers.toString())
+    }
+  }
+
+  // Fonction pour calculer le prix estimé
+  const calculateEstimatedPrice = () => {
+    const basePrice = vehicleType === 'van' ? 80 : 50
+    const passagersCount = parseInt(watch('passagers') || '1')
+    const serviceMultiplier = serviceType === 'mise-a-disposition' ? 1.5 : 1
+    const siegeEnfantCount = parseInt(watch('siegeEnfant') || '0')
+    const bouquetFleurs = watch('bouquetFleurs') || false
+    const assistanceAeroport = watch('assistanceAeroport') || false
+    
+    let estimatedPrice = basePrice + (passagersCount - 1) * 10
+    estimatedPrice *= serviceMultiplier
+    estimatedPrice += siegeEnfantCount * 10
+    if (bouquetFleurs) estimatedPrice += 75
+    if (assistanceAeroport) estimatedPrice += 120
+    
+    return Math.round(estimatedPrice)
   }
 
   // Fonctions pour gérer les étapes
@@ -423,6 +466,41 @@ export default function SecureReservationForm() {
             </div>
           </div>
 
+          {/* Choix du véhicule */}
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Type de véhicule</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleVehicleTypeChange('confort')}
+                disabled={rateLimitInfo.blocked}
+                className={`p-4 rounded-lg border-2 text-center transition-colors disabled:opacity-50 ${
+                  vehicleType === 'confort'
+                    ? 'border-blue-600 bg-blue-50 text-blue-900'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                <div className="font-semibold">Voiture Confort</div>
+                <div className="text-sm mt-1">1-3 passagers</div>
+                <div className="text-xs mt-1 text-gray-500">À partir de 50€</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleVehicleTypeChange('van')}
+                disabled={rateLimitInfo.blocked}
+                className={`p-4 rounded-lg border-2 text-center transition-colors disabled:opacity-50 ${
+                  vehicleType === 'van'
+                    ? 'border-blue-600 bg-blue-50 text-blue-900'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                <div className="font-semibold">Voiture Van</div>
+                <div className="text-sm mt-1">1-8 passagers</div>
+                <div className="text-xs mt-1 text-gray-500">À partir de 80€</div>
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Champ honeypot caché */}
             <input
@@ -549,7 +627,7 @@ export default function SecureReservationForm() {
                       }`}
                       disabled={rateLimitInfo.blocked || isSubmitting}
                     >
-                      {[1, 2, 3].map(num => (
+                      {Array.from({ length: vehicleType === 'van' ? 8 : 3 }, (_, i) => i + 1).map(num => (
                         <option key={num} value={num}>{num} passager{num > 1 ? 's' : ''}</option>
                       ))}
                     </select>
@@ -799,6 +877,181 @@ export default function SecureReservationForm() {
                 </div>
               </div>
             </div>
+
+            {/* Options facultatives */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Options</h3>
+              <p className="text-sm text-gray-600 mb-6">Ajoutez des services supplémentaires à votre réservation (facultatif)</p>
+              
+              <div className="space-y-6">
+                {/* Sièges enfants */}
+                <div className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900">Sièges enfants</h4>
+                        <p className="text-sm text-gray-500">Pour enfants de 0 à 36 mois</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-green-600">€10.00</div>
+                        <div className="text-xs text-gray-500">par siège</div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <select
+                        {...register('siegeEnfant')}
+                        className={`w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm ${
+                          errors.siegeEnfant ? 'border-red-500' : ''
+                        }`}
+                        disabled={rateLimitInfo.blocked || isSubmitting}
+                      >
+                        {[0, 1, 2, 3, 4, 5].map(num => (
+                          <option key={num} value={num}>{num}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {errors.siegeEnfant && (
+                      <p className="mt-2 text-sm text-red-600">{errors.siegeEnfant.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bouquet de fleurs */}
+                <div className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900">Bouquet de fleurs</h4>
+                        <p className="text-sm text-gray-500">Bouquet préparé par notre fleuriste local</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-green-600">€75.00</div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="flex items-center">
+                        <input
+                          {...register('bouquetFleurs')}
+                          type="checkbox"
+                          className={`rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
+                            errors.bouquetFleurs ? 'border-red-500' : ''
+                          }`}
+                          disabled={rateLimitInfo.blocked || isSubmitting}
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Ajouter un bouquet de fleurs</span>
+                      </label>
+                    </div>
+                    {errors.bouquetFleurs && (
+                      <p className="mt-2 text-sm text-red-600">{errors.bouquetFleurs.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Assistance Aéroport */}
+                <div className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900">Assistance Aéroport</h4>
+                        <p className="text-sm text-gray-500">Accompagnement complet jusqu'à la porte d'embarquement</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-green-600">€120.00</div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="flex items-center">
+                        <input
+                          {...register('assistanceAeroport')}
+                          type="checkbox"
+                          className={`rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
+                            errors.assistanceAeroport ? 'border-red-500' : ''
+                          }`}
+                          disabled={rateLimitInfo.blocked || isSubmitting}
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Ajouter l'assistance aéroport</span>
+                      </label>
+                    </div>
+                    {errors.assistanceAeroport && (
+                      <p className="mt-2 text-sm text-red-600">{errors.assistanceAeroport.message}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Prix estimé */}
+            {(vehicleType || routeInfo) && (
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Prix estimé</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Type de véhicule:</span>
+                      <span className="font-medium">
+                        {vehicleType === 'van' ? 'Van (1-8 passagers)' : 'Confort (1-3 passagers)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Nombre de passagers:</span>
+                      <span className="font-medium">{watch('passagers') || 1}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Type de service:</span>
+                      <span className="font-medium">
+                        {serviceType === 'transfert' ? 'Transfert' : 'Mise à disposition'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {routeInfo && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Distance:</span>
+                        <span className="font-medium">{routeInfo.distance}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Durée estimée:</span>
+                        <span className="font-medium">{routeInfo.duration}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-900">Prix estimé:</span>
+                    <span className="text-2xl font-bold text-green-600">
+                      {calculateEstimatedPrice()} €
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Prix indicatif, le tarif final sera confirmé après validation de votre demande
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Affichage des erreurs */}
             {submitError && (
