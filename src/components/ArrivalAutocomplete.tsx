@@ -3,12 +3,17 @@ import { useEffect, useRef, useState } from 'react'
 import { googleMapsService } from '@/lib/googleMaps'
 
 interface ArrivalAutocompleteProps {
-  value: string
+  value: string // Utilisé uniquement pour l'initialisation
   onChange: (value: string, placeDetails?: google.maps.places.PlaceResult) => void
   onError?: (error: string) => void
   className?: string
   required?: boolean
   disabled?: boolean
+}
+
+export interface ArrivalAutocompleteRef {
+  reset: () => void
+  setValue: (value: string) => void
 }
 
 export default function ArrivalAutocomplete({
@@ -21,31 +26,14 @@ export default function ArrivalAutocomplete({
 }: ArrivalAutocompleteProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [error, setError] = useState('')
-  const [internalValue, setInternalValue] = useState(value)
+  const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
+  const [isInitialized, setIsInitialized] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  // Synchroniser UNIQUEMENT lors de reset externe (pas à chaque changement)
-  useEffect(() => {
-    // SEULEMENT si c'est un reset complet (valeur externe devient vide)
-    if (value === '' && internalValue !== '') {
-      console.log('🔴 [ARRIVEE] External reset detected, clearing internal value')
-      setInternalValue('')
-      if (inputRef.current) {
-        inputRef.current.value = ''
-      }
-    }
-    // Plus de synchronisation pour les autres cas - évite les boucles
-  }, [value === '']) // Dépendance sur le booléen, pas sur value directement
-
-  // S'assurer que l'input HTML reflète l'état interne
-  useEffect(() => {
-    if (inputRef.current && inputRef.current.value !== internalValue) {
-      console.log('🔵 [ARRIVEE] Syncing input HTML with internal value:', internalValue)
-      inputRef.current.value = internalValue
-    }
-  }, [internalValue])
+  // AUCUNE synchronisation externe - complètement isolé
+  // Le composant gère son propre état sans écouter les props
 
   useEffect(() => {
     const initializeAutocomplete = async () => {
@@ -88,6 +76,7 @@ export default function ArrivalAutocomplete({
           })
 
           setIsLoaded(true)
+          setIsInitialized(true)
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Erreur de chargement Google Maps'

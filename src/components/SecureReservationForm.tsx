@@ -285,7 +285,7 @@ export default function SecureReservationForm() {
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
-                    value={departValue}
+                    value="" // Pas de synchronisation externe
                     onChange={(value, placeDetails) => {
                       console.log('🟢 [FORM] Départ onChange:', {
                         value,
@@ -321,7 +321,7 @@ export default function SecureReservationForm() {
                       Lieu d'arrivée *
                     </label>
                     <ArrivalAutocomplete
-                      value={arriveeValue}
+                      value="" // Pas de synchronisation externe
                       onChange={(value, placeDetails) => {
                         console.log('🔵 [FORM] Arrivée onChange:', {
                           value,
