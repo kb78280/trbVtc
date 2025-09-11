@@ -46,6 +46,10 @@ export default function SecureReservationForm() {
   // États pour les valeurs d'adresse (isolés)
   const [departValue, setDepartValue] = useState('')
   const [arriveeValue, setArriveeValue] = useState('')
+  
+  // États d'autocomplétion pour l'affichage de la carte
+  const [isDepartAutocompleted, setIsDepartAutocompleted] = useState(false)
+  const [isArriveeAutocompleted, setIsArriveeAutocompleted] = useState(false)
 
   // Debug: Log des changements d'états
   useEffect(() => {
@@ -69,13 +73,15 @@ export default function SecureReservationForm() {
   }, [destinationPlace])
 
   useEffect(() => {
+    const canShowMap = isDepartAutocompleted || (serviceType === 'transfert' && isArriveeAutocompleted)
     console.log('🗺️ [MAP] Can show map?', {
-      hasOrigin: !!originPlace,
-      hasDestination: !!destinationPlace,
+      isDepartAutocompleted,
+      isArriveeAutocompleted,
       serviceType,
-      bothNeeded: serviceType === 'transfert'
+      canShowMap,
+      rule: 'Au moins un input autocompléé'
     })
-  }, [originPlace, destinationPlace, serviceType])
+  }, [isDepartAutocompleted, isArriveeAutocompleted, serviceType])
 
   const honeypot = HoneypotProtection.createHoneypot()
 
@@ -299,23 +305,18 @@ export default function SecureReservationForm() {
                   </label>
                   <DepartureAutocomplete
                     value="" // Pas de synchronisation externe
-                    onChange={(value, placeDetails) => {
-                      console.log('🏠 [PARENT] 📨 RECEIVED onChange from DEPART component:', value)
-                      console.log('🏠 [PARENT] Current departValue before update:', departValue)
+                    onChange={(value, placeDetails, isAutocompleted) => {
+                      console.log('🏠 [PARENT] 📨 DEPART onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
                       
                       setDepartValue(value)
-                      console.log('🏠 [PARENT] ✅ Called setDepartValue - This will cause parent re-render')
+                      setIsDepartAutocompleted(!!isAutocompleted)
                       
-                      // NE PAS utiliser setValue ici - seulement à la soumission
                       if (placeDetails && placeDetails.geometry) {
-                        console.log('🏠 [PARENT] Setting origin place:', placeDetails.formatted_address)
+                        console.log('🏠 [PARENT] ✅ DEPART place avec géométrie:', placeDetails.formatted_address)
                         setOriginPlace(placeDetails)
-                      } else if (!placeDetails) {
-                        // L'utilisateur tape manuellement
-                        if (originPlace && !value.includes(originPlace.formatted_address?.split(',')[0] || '')) {
-                          console.log('🏠 [PARENT] Clearing origin place because address changed significantly')
-                          setOriginPlace(null)
-                        }
+                      } else {
+                        console.log('🏠 [PARENT] ❌ DEPART pas de géométrie, clearing place')
+                        setOriginPlace(null)
                       }
                     }}
                     className=""
@@ -332,25 +333,18 @@ export default function SecureReservationForm() {
                     </label>
                     <ArrivalAutocomplete
                       value="" // Pas de synchronisation externe
-                      onChange={(value, placeDetails) => {
-                        console.log('🏠 [PARENT] 📨 RECEIVED onChange from ARRIVEE component:', value)
-                        console.log('🏠 [PARENT] 🚨 CRITICAL: This onChange will cause parent re-render, affecting DEPART component!')
-                        console.log('🏠 [PARENT] Current arriveeValue before update:', arriveeValue)
-                        console.log('🏠 [PARENT] Current departValue (should not change):', departValue)
+                      onChange={(value, placeDetails, isAutocompleted) => {
+                        console.log('🏠 [PARENT] 📨 ARRIVEE onChange:', { value, hasPlace: !!placeDetails, isAutocompleted })
                         
                         setArriveeValue(value)
-                        console.log('🏠 [PARENT] ✅ Called setArriveeValue - Parent will re-render now!')
+                        setIsArriveeAutocompleted(!!isAutocompleted)
                         
-                        // NE PAS utiliser setValue ici - seulement à la soumission
                         if (placeDetails && placeDetails.geometry) {
-                          console.log('🏠 [PARENT] Setting destination place:', placeDetails.formatted_address)
+                          console.log('🏠 [PARENT] ✅ ARRIVEE place avec géométrie:', placeDetails.formatted_address)
                           setDestinationPlace(placeDetails)
-                        } else if (!placeDetails) {
-                          // L'utilisateur tape manuellement
-                          if (destinationPlace && !value.includes(destinationPlace.formatted_address?.split(',')[0] || '')) {
-                            console.log('🏠 [PARENT] Clearing destination place because address changed significantly')
-                            setDestinationPlace(null)
-                          }
+                        } else {
+                          console.log('🏠 [PARENT] ❌ ARRIVEE pas de géométrie, clearing place')
+                          setDestinationPlace(null)
                         }
                       }}
                       className=""
@@ -448,13 +442,13 @@ export default function SecureReservationForm() {
             </div>
 
             {/* Carte interactive - Affichée seulement si on a les deux adresses pour un transfert */}
-            {serviceType === 'transfert' && originPlace && destinationPlace && (
+            {(isDepartAutocompleted || isArriveeAutocompleted) && originPlace && (
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Aperçu de votre trajet</h3>
                 
                 <InteractiveMap
                   origin={originPlace}
-                  destination={destinationPlace}
+                  destination={serviceType === 'transfert' ? destinationPlace : null}
                   height="300px"
                   onRouteCalculated={(distance, duration) => {
                     setRouteInfo({ distance, duration })

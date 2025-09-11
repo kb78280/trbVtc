@@ -4,7 +4,7 @@ import { googleMapsService } from '@/lib/googleMaps'
 
 interface DepartureAutocompleteProps {
   value: string // Utilisé uniquement pour l'initialisation
-  onChange: (value: string, placeDetails?: google.maps.places.PlaceResult) => void
+  onChange: (value: string, placeDetails?: google.maps.places.PlaceResult, isAutocompleted?: boolean) => void
   onError?: (error: string) => void
   className?: string
   required?: boolean
@@ -29,6 +29,7 @@ export default function DepartureAutocomplete({
   const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
   const [isInitialized, setIsInitialized] = useState(false)
   const [isSelecting, setIsSelecting] = useState(false) // Protection pendant sélection
+  const [isAutocompleted, setIsAutocompleted] = useState(false) // Suivi de l'état d'autocomplétion
   
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
@@ -68,20 +69,16 @@ export default function DepartureAutocomplete({
             const formattedAddress = place.formatted_address || ''
             
             if (formattedAddress) {
-              console.log('[DEPART] Valid address selected:', formattedAddress)
+              console.log('🟢 [DEPART] ✅ AUTOCOMPLETE SUCCESS:', formattedAddress)
               setInternalValue(formattedAddress)
+              setIsAutocompleted(true) // Marquer comme autocompléé
               // Forcer la mise à jour de l'input HTML aussi
               if (inputRef.current) {
                 inputRef.current.value = formattedAddress
               }
-              onChange(formattedAddress, place)
+              onChange(formattedAddress, place, true) // Indiquer que c'est autocompléé
               
-              // Forcer encore une fois après un délai pour s'assurer
               setTimeout(() => {
-                if (inputRef.current) {
-                  inputRef.current.value = formattedAddress
-                  console.log('[DEPART] Double-check input value:', formattedAddress)
-                }
                 setIsSelecting(false)
               }, 100)
             } else {
@@ -111,13 +108,11 @@ export default function DepartureAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('🟢 [DEPART] USER TYPING - New value:', newValue, 'Previous internal:', internalValue)
+    console.log('🟢 [DEPART] 👤 USER TYPING:', newValue)
     
     setInternalValue(newValue)
-    console.log('🟢 [DEPART] Called setInternalValue with:', newValue)
-    
-    onChange(newValue)
-    console.log('🟢 [DEPART] Called onChange with:', newValue)
+    setIsAutocompleted(false) // Réinitialiser l'état d'autocomplétion
+    onChange(newValue, undefined, false) // Pas autocompléé
     
     if (error) {
       setError('')
@@ -130,36 +125,12 @@ export default function DepartureAutocomplete({
     }
   }
 
-  // Synchroniser avec ce que Google Maps a mis dans l'input
+  // Solution simple : garder la valeur stable après autocomplétion
   useEffect(() => {
-    if (inputRef.current && !isSelecting) { // Ne pas synchroniser pendant une sélection
-      const currentInputValue = inputRef.current.value
-      console.log('🟢 [DEPART] RENDER - Current input value:', currentInputValue, 'Internal value:', internalValue)
-      
-      if (currentInputValue !== internalValue && currentInputValue.length > internalValue.length) {
-        // Seulement si Google Maps a AJOUTÉ du contenu (autocomplétion)
-        console.log('🟢 [DEPART] GOOGLE AUTOCOMPLETE DETECTED - Input expanded from', internalValue, 'to', currentInputValue)
-        setInternalValue(currentInputValue)
-        
-        // Géocoder l'adresse pour obtenir les placeDetails
-        if (window.google?.maps?.Geocoder) {
-          const geocoder = new window.google.maps.Geocoder()
-          geocoder.geocode({ address: currentInputValue }, (results, status) => {
-            if (status === 'OK' && results && results[0]) {
-              console.log('🟢 [DEPART] GEOCODING SUCCESS for:', currentInputValue)
-              const place = results[0]
-              onChange(currentInputValue, place)
-            } else {
-              console.log('🟢 [DEPART] GEOCODING FAILED for:', currentInputValue)
-              onChange(currentInputValue) // Sans placeDetails
-            }
-          })
-        } else {
-          onChange(currentInputValue) // Sans placeDetails si pas de geocoder
-        }
-      } else if (currentInputValue !== internalValue && currentInputValue.length < internalValue.length) {
-        // Si l'input a été raccourci, on force notre valeur
-        console.log('🟢 [DEPART] INPUT SHORTENED - Forcing back to:', internalValue)
+    if (inputRef.current && isAutocompleted) {
+      // Si on a été autocompléé, forcer la valeur stable
+      if (inputRef.current.value !== internalValue) {
+        console.log('🟢 [DEPART] PROTECTING AUTOCOMPLETED VALUE - Restoring:', internalValue)
         inputRef.current.value = internalValue
       }
     }
