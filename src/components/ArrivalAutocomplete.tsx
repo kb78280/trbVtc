@@ -26,14 +26,16 @@ export default function ArrivalAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  // Synchroniser avec la valeur externe seulement si elle est différente
-  // et qu'elle ne vient pas de notre propre onChange
+  // Synchroniser UNIQUEMENT à l'initialisation et lors de reset externe
   useEffect(() => {
-    if (value !== internalValue && value !== '') {
-      console.log('[ARRIVEE] External value changed from', internalValue, 'to', value)
+    if (value === '' && internalValue !== '') {
+      console.log('[ARRIVEE] External reset detected, clearing internal value')
+      setInternalValue('')
+    } else if (value !== '' && internalValue === '' && value !== internalValue) {
+      console.log('[ARRIVEE] Initial value set from external:', value)
       setInternalValue(value)
     }
-  }, [value, internalValue])
+  }, [value])
 
   useEffect(() => {
     const initializeAutocomplete = async () => {

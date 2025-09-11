@@ -43,9 +43,9 @@ export default function SecureReservationForm() {
   const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
   
-  // Références pour les valeurs d'adresse pour éviter les conflits
-  const departValueRef = useRef<string>('')
-  const arriveeValueRef = useRef<string>('')
+  // États pour les valeurs d'adresse (isolés)
+  const [departValue, setDepartValue] = useState('')
+  const [arriveeValue, setArriveeValue] = useState('')
 
   const honeypot = HoneypotProtection.createHoneypot()
 
@@ -132,8 +132,8 @@ export default function SecureReservationForm() {
       reset()
       
       // Réinitialiser les états locaux
-      departValueRef.current = ''
-      arriveeValueRef.current = ''
+      setDepartValue('')
+      setArriveeValue('')
       setOriginPlace(null)
       setDestinationPlace(null)
       setRouteInfo(null)
@@ -156,7 +156,7 @@ export default function SecureReservationForm() {
     
     // Réinitialiser les champs d'adresse si on passe à "mise-a-disposition"
     if (type === 'mise-a-disposition') {
-      arriveeValueRef.current = ''
+      setArriveeValue('')
       setValue('arrivee', '')
       setDestinationPlace(null)
       setRouteInfo(null)
@@ -254,10 +254,10 @@ export default function SecureReservationForm() {
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
-                    value={departValueRef.current}
+                    value={departValue}
                     onChange={(value, placeDetails) => {
                       console.log('[FORM] Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
-                      departValueRef.current = value
+                      setDepartValue(value)
                       setValue('depart', value, { shouldValidate: false, shouldDirty: true })
                       if (placeDetails && placeDetails.geometry) {
                         setOriginPlace(placeDetails)
@@ -285,10 +285,10 @@ export default function SecureReservationForm() {
                       Lieu d'arrivée *
                     </label>
                     <ArrivalAutocomplete
-                      value={arriveeValueRef.current}
+                      value={arriveeValue}
                       onChange={(value, placeDetails) => {
                         console.log('[FORM] Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
-                        arriveeValueRef.current = value
+                        setArriveeValue(value)
                         setValue('arrivee', value, { shouldValidate: false, shouldDirty: true })
                         if (placeDetails && placeDetails.geometry) {
                           setDestinationPlace(placeDetails)
