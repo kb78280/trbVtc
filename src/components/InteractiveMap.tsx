@@ -122,12 +122,29 @@ export default function InteractiveMap({
       hasOrigin: !!origin,
       hasDestination: !!destination,
       waypointsCount: validWaypoints.length,
-      onRouteCalculatedType: typeof onRouteCalculated
+      onRouteCalculatedType: typeof onRouteCalculated,
+      originAddress: origin?.formatted_address,
+      destinationAddress: destination?.formatted_address,
+      waypointsAddresses: validWaypoints.map(w => w.formatted_address)
     })
+    
+    // DIAGNOSTIC: Vérifier si les références changent
+    console.log(`🔄 [MAP] [${effectId}] REFS CHECK:`, {
+      originRef: origin === window.lastOrigin ? 'SAME' : 'DIFFERENT',
+      destinationRef: destination === window.lastDestination ? 'SAME' : 'DIFFERENT', 
+      waypointsRef: validWaypoints === window.lastValidWaypoints ? 'SAME' : 'DIFFERENT',
+      callbackRef: onRouteCalculated === window.lastOnRouteCalculated ? 'SAME' : 'DIFFERENT'
+    })
+    
+    // Stocker les références pour comparaison
+    window.lastOrigin = origin
+    window.lastDestination = destination  
+    window.lastValidWaypoints = validWaypoints
+    window.lastOnRouteCalculated = onRouteCalculated
     
     console.log(`🔄 [MAP] [${effectId}] APPEL calculateRoute()`)
     calculateRoute()
-  }, [isLoaded, origin, destination, validWaypoints, onRouteCalculated])
+  }, [isLoaded, origin, destination, validWaypoints])
 
   if (error) {
     return (

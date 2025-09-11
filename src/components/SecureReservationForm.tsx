@@ -295,7 +295,18 @@ export default function SecureReservationForm() {
       etapeId: newEtapes[index].id,
       value, 
       hasPlace: !!placeDetails,
-      totalValidPlaces: newEtapesPlaces.filter(p => p !== null).length
+      placeDetails: placeDetails ? {
+        formatted_address: placeDetails.formatted_address,
+        hasGeometry: !!placeDetails.geometry,
+        geometryLocation: placeDetails.geometry?.location ? 'present' : 'missing'
+      } : null,
+      totalValidPlaces: newEtapesPlaces.filter(p => p !== null).length,
+      allEtapesPlaces: newEtapesPlaces.map((p, i) => ({
+        index: i,
+        hasPlace: !!p,
+        address: p?.formatted_address || 'null',
+        hasGeometry: !!p?.geometry
+      }))
     })
   }
 
@@ -307,16 +318,34 @@ export default function SecureReservationForm() {
 
   // Waypoints mémorisés pour éviter les recalculs inutiles
   const memoizedValidWaypoints = useMemo(() => {
+    console.log('🗺️ [PARENT] RECALCUL waypoints - serviceType:', serviceType)
+    
     if (serviceType !== 'mise-a-disposition') {
       console.log('🗺️ [PARENT] Pas de waypoints (service transfert)')
       return []
     }
-    const validPlaces = etapesPlaces.filter(place => place !== null) as google.maps.places.PlaceResult[]
-    console.log('🗺️ [PARENT] Waypoints mémorisés:', {
+    
+    console.log('🗺️ [PARENT] ANALYSE etapesPlaces:', {
       totalEtapes: etapesPlaces.length,
-      validPlaces: validPlaces.length,
+      detailsEtapes: etapesPlaces.map((place, i) => ({
+        index: i,
+        isNull: place === null,
+        hasPlace: !!place,
+        address: place?.formatted_address || 'null',
+        hasGeometry: !!place?.geometry,
+        geometryLocation: place?.geometry?.location ? 'present' : 'missing'
+      }))
+    })
+    
+    const validPlaces = etapesPlaces.filter(place => place !== null && place.geometry && place.geometry.location) as google.maps.places.PlaceResult[]
+    
+    console.log('🗺️ [PARENT] Waypoints FILTRÉS:', {
+      totalEtapes: etapesPlaces.length,
+      nonNullPlaces: etapesPlaces.filter(p => p !== null).length,
+      validPlacesWithGeometry: validPlaces.length,
       addresses: validPlaces.map(p => p.formatted_address)
     })
+    
     return validPlaces
   }, [serviceType, etapesPlaces])
 

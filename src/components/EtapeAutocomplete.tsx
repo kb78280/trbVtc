@@ -44,9 +44,17 @@ export default function EtapeAutocomplete({
           autocomplete.addListener('place_changed', () => {
             setIsSelecting(true)
             const place = autocomplete.getPlace()
+            
+            console.log('🟡 [ETAPE] 🎯 PLACE_CHANGED détecté:', {
+              hasPlace: !!place,
+              formatted_address: place?.formatted_address || 'missing',
+              hasGeometry: !!place?.geometry,
+              geometryLocation: place?.geometry?.location ? 'present' : 'missing',
+              place_id: place?.place_id || 'missing'
+            })
 
             if (!place.formatted_address) {
-              console.warn('[ETAPE] Place sans formatted_address')
+              console.warn('🟡 [ETAPE] ❌ Place sans formatted_address:', place)
               setIsSelecting(false)
               return
             }
@@ -55,19 +63,28 @@ export default function EtapeAutocomplete({
             const formattedAddress = place.formatted_address || ''
             
             if (formattedAddress) {
-              console.log('🟡 [ETAPE] ✅ AUTOCOMPLETE SUCCESS:', formattedAddress)
+              console.log('🟡 [ETAPE] ✅ AUTOCOMPLETE SUCCESS - Appel onChange:', {
+                formattedAddress,
+                hasGeometry: !!place.geometry,
+                geometryLocation: place.geometry?.location ? 'present' : 'missing',
+                willPassPlaceDetails: true
+              })
+              
               setInternalValue(formattedAddress)
               setIsAutocompleted(true)
               
               if (inputRef.current) {
                 inputRef.current.value = formattedAddress
               }
+              
+              // CRITIQUE: Passer les détails complets du lieu
               onChange(formattedAddress, place)
               
               setTimeout(() => {
                 setIsSelecting(false)
               }, 100)
             } else {
+              console.log('🟡 [ETAPE] ❌ Pas de formattedAddress valide')
               setIsSelecting(false)
             }
           })
