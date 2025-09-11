@@ -97,14 +97,14 @@ export default function ArrivalAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('🔵 [ARRIVEE] Input change:', {
-      newValue,
-      currentInternalValue: internalValue,
-      currentExternalValue: value,
-      willCallOnChange: true
-    })
+    console.log('🔵 [ARRIVEE] USER TYPING - New value:', newValue, 'Previous internal:', internalValue)
+    console.log('🔵 [ARRIVEE] ⚠️ ATTENTION: Je vais déclencher onChange qui pourrait affecter le composant DEPART')
+    
     setInternalValue(newValue)
+    console.log('🔵 [ARRIVEE] Called setInternalValue with:', newValue)
+    
     onChange(newValue)
+    console.log('🔵 [ARRIVEE] ✅ Called onChange with:', newValue, '- Ceci pourrait causer un re-render du parent')
     
     if (error) {
       setError('')
@@ -117,11 +117,19 @@ export default function ArrivalAutocomplete({
     }
   }
 
-  // Forcer la synchronisation de l'input à chaque render
+  // Synchroniser avec ce que Google Maps a mis dans l'input
   useEffect(() => {
     if (inputRef.current) {
-      inputRef.current.value = internalValue
-      console.log('🔵 [ARRIVEE] Force input value to:', internalValue)
+      const currentInputValue = inputRef.current.value
+      console.log('🔵 [ARRIVEE] RENDER - Current input value:', currentInputValue, 'Internal value:', internalValue)
+      
+      if (currentInputValue !== internalValue) {
+        console.log('🔵 [ARRIVEE] SYNC DETECTED - Google Maps changed input to:', currentInputValue)
+        console.log('🔵 [ARRIVEE] Updating internalValue from', internalValue, 'to', currentInputValue)
+        setInternalValue(currentInputValue)
+        // Notifier le parent du changement
+        onChange(currentInputValue)
+      }
     }
   })
 

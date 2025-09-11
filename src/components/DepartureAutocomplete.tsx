@@ -111,14 +111,13 @@ export default function DepartureAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log('🟢 [DEPART] Input change:', {
-      newValue,
-      currentInternalValue: internalValue,
-      currentExternalValue: value,
-      willCallOnChange: true
-    })
+    console.log('🟢 [DEPART] USER TYPING - New value:', newValue, 'Previous internal:', internalValue)
+    
     setInternalValue(newValue)
+    console.log('🟢 [DEPART] Called setInternalValue with:', newValue)
+    
     onChange(newValue)
+    console.log('🟢 [DEPART] Called onChange with:', newValue)
     
     if (error) {
       setError('')
@@ -131,11 +130,22 @@ export default function DepartureAutocomplete({
     }
   }
 
-  // Forcer la synchronisation de l'input à chaque render
+  // Synchroniser avec ce que Google Maps a mis dans l'input
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.value = internalValue
-      console.log('🟢 [DEPART] Force input value to:', internalValue)
+    if (inputRef.current && !isSelecting) { // Ne pas synchroniser pendant une sélection
+      const currentInputValue = inputRef.current.value
+      console.log('🟢 [DEPART] RENDER - Current input value:', currentInputValue, 'Internal value:', internalValue)
+      
+      if (currentInputValue !== internalValue && currentInputValue.length > internalValue.length) {
+        // Seulement si Google Maps a AJOUTÉ du contenu (autocomplétion)
+        console.log('🟢 [DEPART] GOOGLE AUTOCOMPLETE DETECTED - Input expanded from', internalValue, 'to', currentInputValue)
+        setInternalValue(currentInputValue)
+        // Ne PAS appeler onChange ici - on garde les placeDetails du place_changed
+      } else if (currentInputValue !== internalValue && currentInputValue.length < internalValue.length) {
+        // Si l'input a été raccourci, on force notre valeur
+        console.log('🟢 [DEPART] INPUT SHORTENED - Forcing back to:', internalValue)
+        inputRef.current.value = internalValue
+      }
     }
   })
 

@@ -49,20 +49,33 @@ export default function SecureReservationForm() {
 
   // Debug: Log des changements d'états
   useEffect(() => {
-    console.log('[DEBUG] State change - departValue:', departValue)
+    console.log('🏠 [PARENT] State change - departValue:', departValue)
+    console.log('🏠 [PARENT] ⚠️ PARENT RE-RENDER causé par departValue change')
   }, [departValue])
 
   useEffect(() => {
-    console.log('[DEBUG] State change - arriveeValue:', arriveeValue)
+    console.log('🏠 [PARENT] State change - arriveeValue:', arriveeValue)
+    console.log('🏠 [PARENT] ⚠️ PARENT RE-RENDER causé par arriveeValue change')
   }, [arriveeValue])
 
   useEffect(() => {
-    console.log('[DEBUG] State change - originPlace:', originPlace?.formatted_address || 'null')
+    console.log('🗺️ [MAP] State change - originPlace:', originPlace?.formatted_address || 'null')
+    console.log('🗺️ [MAP] Has geometry:', !!originPlace?.geometry)
   }, [originPlace])
 
   useEffect(() => {
-    console.log('[DEBUG] State change - destinationPlace:', destinationPlace?.formatted_address || 'null')
+    console.log('🗺️ [MAP] State change - destinationPlace:', destinationPlace?.formatted_address || 'null')
+    console.log('🗺️ [MAP] Has geometry:', !!destinationPlace?.geometry)
   }, [destinationPlace])
+
+  useEffect(() => {
+    console.log('🗺️ [MAP] Can show map?', {
+      hasOrigin: !!originPlace,
+      hasDestination: !!destinationPlace,
+      serviceType,
+      bothNeeded: serviceType === 'transfert'
+    })
+  }, [originPlace, destinationPlace, serviceType])
 
   const honeypot = HoneypotProtection.createHoneypot()
 
@@ -287,23 +300,20 @@ export default function SecureReservationForm() {
                   <DepartureAutocomplete
                     value="" // Pas de synchronisation externe
                     onChange={(value, placeDetails) => {
-                      console.log('🟢 [FORM] Départ onChange:', {
-                        value,
-                        hasPlaceDetails: !!placeDetails,
-                        placeAddress: placeDetails?.formatted_address,
-                        currentDepartValue: departValue,
-                        currentOriginPlace: originPlace?.formatted_address
-                      })
+                      console.log('🏠 [PARENT] 📨 RECEIVED onChange from DEPART component:', value)
+                      console.log('🏠 [PARENT] Current departValue before update:', departValue)
+                      
                       setDepartValue(value)
+                      console.log('🏠 [PARENT] ✅ Called setDepartValue - This will cause parent re-render')
+                      
                       // NE PAS utiliser setValue ici - seulement à la soumission
                       if (placeDetails && placeDetails.geometry) {
-                        console.log('🟢 [FORM] Setting origin place:', placeDetails.formatted_address)
+                        console.log('🏠 [PARENT] Setting origin place:', placeDetails.formatted_address)
                         setOriginPlace(placeDetails)
                       } else if (!placeDetails) {
                         // L'utilisateur tape manuellement
-                        console.log('🟡 [FORM] Manual typing, checking if should clear origin place')
                         if (originPlace && !value.includes(originPlace.formatted_address?.split(',')[0] || '')) {
-                          console.log('🔴 [FORM] Clearing origin place because address changed significantly')
+                          console.log('🏠 [PARENT] Clearing origin place because address changed significantly')
                           setOriginPlace(null)
                         }
                       }
@@ -323,25 +333,22 @@ export default function SecureReservationForm() {
                     <ArrivalAutocomplete
                       value="" // Pas de synchronisation externe
                       onChange={(value, placeDetails) => {
-                        console.log('🔵 [FORM] Arrivée onChange:', {
-                          value,
-                          hasPlaceDetails: !!placeDetails,
-                          placeAddress: placeDetails?.formatted_address,
-                          currentArriveeValue: arriveeValue,
-                          currentDestinationPlace: destinationPlace?.formatted_address,
-                          currentDepartValue: departValue,
-                          currentOriginPlace: originPlace?.formatted_address
-                        })
+                        console.log('🏠 [PARENT] 📨 RECEIVED onChange from ARRIVEE component:', value)
+                        console.log('🏠 [PARENT] 🚨 CRITICAL: This onChange will cause parent re-render, affecting DEPART component!')
+                        console.log('🏠 [PARENT] Current arriveeValue before update:', arriveeValue)
+                        console.log('🏠 [PARENT] Current departValue (should not change):', departValue)
+                        
                         setArriveeValue(value)
+                        console.log('🏠 [PARENT] ✅ Called setArriveeValue - Parent will re-render now!')
+                        
                         // NE PAS utiliser setValue ici - seulement à la soumission
                         if (placeDetails && placeDetails.geometry) {
-                          console.log('🔵 [FORM] Setting destination place:', placeDetails.formatted_address)
+                          console.log('🏠 [PARENT] Setting destination place:', placeDetails.formatted_address)
                           setDestinationPlace(placeDetails)
                         } else if (!placeDetails) {
                           // L'utilisateur tape manuellement
-                          console.log('🟡 [FORM] Manual typing arrivée, checking if should clear destination place')
                           if (destinationPlace && !value.includes(destinationPlace.formatted_address?.split(',')[0] || '')) {
-                            console.log('🔴 [FORM] Clearing destination place because address changed significantly')
+                            console.log('🏠 [PARENT] Clearing destination place because address changed significantly')
                             setDestinationPlace(null)
                           }
                         }
