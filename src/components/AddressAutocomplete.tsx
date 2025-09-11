@@ -46,14 +46,29 @@ export default function AddressAutocomplete({
           autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace()
             
+            // Debug détaillé
+            console.log(`[${id}] Place changed:`, {
+              hasGeometry: !!place.geometry,
+              hasLocation: !!place.geometry?.location,
+              address: place.formatted_address,
+              placeId: place.place_id
+            })
+            
             if (!place.geometry || !place.geometry.location) {
+              console.warn(`[${id}] Invalid place selected`)
               setError('Adresse non trouvée. Veuillez sélectionner une suggestion.')
               onError?.('Adresse non trouvée')
               return
             }
 
             setError('')
-            onChange(place.formatted_address || '', place)
+            const formattedAddress = place.formatted_address || ''
+            
+            // Seulement déclencher onChange si on a une adresse valide
+            if (formattedAddress) {
+              console.log(`[${id}] Valid address selected:`, formattedAddress)
+              onChange(formattedAddress, place)
+            }
           })
 
           setIsLoaded(true)
@@ -78,6 +93,7 @@ export default function AddressAutocomplete({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
+    // Toujours déclencher onChange pour maintenir la synchronisation
     onChange(newValue)
     
     // Effacer l'erreur quand l'utilisateur tape

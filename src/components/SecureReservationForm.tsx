@@ -126,6 +126,11 @@ export default function SecureReservationForm() {
       alert('Réservation envoyée avec succès ! Redirection vers le calcul du prix...')
       reset()
       
+      // Réinitialiser les états locaux
+      setOriginPlace(null)
+      setDestinationPlace(null)
+      setRouteInfo(null)
+      
       // Générer un nouveau token CSRF
       const newToken = CSRFProtection.setToken()
       setCsrfToken(newToken)
@@ -141,6 +146,13 @@ export default function SecureReservationForm() {
   const handleServiceTypeChange = (type: ServiceType) => {
     setServiceType(type)
     setValue('serviceType', type)
+    
+    // Réinitialiser les champs d'adresse si on passe à "mise-a-disposition"
+    if (type === 'mise-a-disposition') {
+      setValue('arrivee', '')
+      setDestinationPlace(null)
+      setRouteInfo(null)
+    }
   }
 
   if (!mounted) {
@@ -239,8 +251,19 @@ export default function SecureReservationForm() {
                     placeholder="Tapez votre adresse de départ..."
                     value={watch('depart') || ''}
                     onChange={(value, placeDetails) => {
-                      setValue('depart', value)
-                      setOriginPlace(placeDetails || null)
+                      console.log('Départ onChange:', value, 'PlaceDetails:', !!placeDetails)
+                      setValue('depart', value, { shouldValidate: false, shouldDirty: true })
+                      if (placeDetails && placeDetails.geometry) {
+                        setOriginPlace(placeDetails)
+                        console.log('Origin place set:', placeDetails.formatted_address)
+                      } else if (!placeDetails) {
+                        // L'utilisateur tape manuellement, on garde le place précédent si l'adresse est similaire
+                        const currentValue = watch('depart') || ''
+                        if (originPlace && !value.includes(originPlace.formatted_address?.split(',')[0] || '')) {
+                          console.log('Clearing origin place because address changed significantly')
+                          setOriginPlace(null)
+                        }
+                      }
                     }}
                     className={errors.depart ? 'border-red-500' : ''}
                     required
@@ -262,8 +285,19 @@ export default function SecureReservationForm() {
                       placeholder="Tapez votre adresse d'arrivée..."
                       value={watch('arrivee') || ''}
                       onChange={(value, placeDetails) => {
-                        setValue('arrivee', value)
-                        setDestinationPlace(placeDetails || null)
+                        console.log('Arrivée onChange:', value, 'PlaceDetails:', !!placeDetails)
+                        setValue('arrivee', value, { shouldValidate: false, shouldDirty: true })
+                        if (placeDetails && placeDetails.geometry) {
+                          setDestinationPlace(placeDetails)
+                          console.log('Destination place set:', placeDetails.formatted_address)
+                        } else if (!placeDetails) {
+                          // L'utilisateur tape manuellement
+                          const currentValue = watch('arrivee') || ''
+                          if (destinationPlace && !value.includes(destinationPlace.formatted_address?.split(',')[0] || '')) {
+                            console.log('Clearing destination place because address changed significantly')
+                            setDestinationPlace(null)
+                          }
+                        }
                       }}
                       className={errors.arrivee ? 'border-red-500' : ''}
                       required
