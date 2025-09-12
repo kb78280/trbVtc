@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,6 +29,9 @@ const reservationSchema = z.object({
 })
 
 type ReservationFormData = z.infer<typeof reservationSchema>
+
+// Tableau constant pour éviter les re-renders
+const EMPTY_WAYPOINTS: never[] = []
 
 export default function SecureReservationForm() {
   const [serviceType, setServiceType] = useState<'transfert' | 'mise-a-disposition'>('transfert')
@@ -131,9 +134,6 @@ export default function SecureReservationForm() {
   const handleRouteCalculated = useCallback((distance: string, duration: string) => {
     setRouteInfo({ distance, duration })
   }, [])
-
-  // Tableau waypoints stable pour éviter les re-renders
-  const emptyWaypoints = useMemo(() => [], [])
 
   // Fonctions pour gérer les étapes
   const addEtape = () => {
@@ -529,8 +529,8 @@ export default function SecureReservationForm() {
                           <InteractiveMap
                             origin={originPlace || undefined}
                             destination={destinationPlace || undefined}
-                            waypoints={emptyWaypoints}
-                            validWaypoints={emptyWaypoints}
+                            waypoints={EMPTY_WAYPOINTS}
+                            validWaypoints={EMPTY_WAYPOINTS}
                             onRouteCalculated={handleRouteCalculated}
                           />
                         </div>
