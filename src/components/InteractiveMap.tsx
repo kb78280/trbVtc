@@ -153,7 +153,7 @@ export default function InteractiveMap({
     
     console.log(`🔄 [MAP] [${effectId}] APPEL calculateRoute()`)
     calculateRoute()
-  }, [isLoaded, origin, destination, validWaypoints])
+  }, [isLoaded, origin, destination, validWaypoints, onRouteCalculated])
 
   if (error) {
     return (
