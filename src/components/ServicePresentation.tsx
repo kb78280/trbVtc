@@ -1,8 +1,27 @@
-export default function ServicePresentation() {
+'use client'
+
+import { useState } from 'react'
+
+interface ServicePresentationProps {
+  hideHeader?: boolean
+}
+
+export default function ServicePresentation({ hideHeader = false }: ServicePresentationProps) {
+  const [expandedServices, setExpandedServices] = useState<number[]>([])
+
+  const toggleService = (index: number) => {
+    setExpandedServices(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    )
+  }
+
   const services = [
     {
       title: 'Transferts Aéroports',
-      description: 'Service de navette vers tous les aéroports parisiens (CDG, Orly, Le Bourget)',
+      description: 'Service de navette vers tous les aéroports parisiens (CDG, Orly, Le Bourget, Beauvais)',
+      expandedContent: 'Nos chauffeurs professionnels vous accueillent avec ponctualité et courtoisie. Suivi de vol en temps réel, assistance avec les bagages, et véhicules climatisés pour un confort optimal. Service disponible 24h/24 avec possibilité de réservation à l\'avance ou en urgence.',
       image: '/imgTransfertAirport.jpg',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -13,6 +32,7 @@ export default function ServicePresentation() {
     {
       title: 'Trajets Gares',
       description: 'Transport vers toutes les gares parisiennes et de banlieue',
+      expandedContent: 'Que ce soit pour Gare du Nord, Gare de Lyon, Saint-Lazare ou toute autre gare parisienne, nous vous garantissons un transport fiable et ponctuel. Idéal pour vos voyages d\'affaires ou personnels, avec prise en charge directe et dépose au plus près de votre destination.',
       image: '/imgTransfertGarde.jpg',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -23,6 +43,7 @@ export default function ServicePresentation() {
     {
       title: 'Événements',
       description: 'Transport pour vos événements professionnels et personnels',
+      expandedContent: 'Mariages, séminaires, soirées d\'entreprise, anniversaires... Nous adaptons notre service à vos besoins spécifiques. Véhicules de prestige disponibles, service de groupe, et coordination parfaite pour que votre événement soit une réussite totale.',
       image: '/imgVoitureInterieur.webp',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -33,6 +54,7 @@ export default function ServicePresentation() {
     {
       title: 'Mise à Disposition',
       description: 'Chauffeur à votre disposition pour vos déplacements multiples',
+      expandedContent: 'Service sur-mesure avec chauffeur dédié pour une demi-journée, journée complète ou plus. Parfait pour les tournées commerciales, visites touristiques, ou déplacements professionnels multiples. Flexibilité totale et tarification adaptée à vos besoins.',
       image: '/imgMiseADispo.jpg',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -43,6 +65,7 @@ export default function ServicePresentation() {
     {
       title: 'Trajets Longue Distance',
       description: 'Déplacements dans toute la France avec confort et sécurité',
+      expandedContent: 'Voyagez sereinement vers toutes les destinations françaises. Véhicules grand confort, pauses régulières, et chauffeurs expérimentés pour les longs trajets. Alternative premium au train ou à l\'avion, avec service porte-à-porte et flexibilité horaire.',
       image: '/imgLongueDistance.jpg',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -54,6 +77,7 @@ export default function ServicePresentation() {
     {
       title: 'Services Premium',
       description: 'Véhicules haut de gamme pour vos déplacements d\'affaires',
+      expandedContent: 'Notre flotte premium répond aux exigences les plus élevées. Intérieurs cuir, Wi-Fi, prises USB, eau fraîche, et journaux du jour. Le summum du raffinement pour vos rendez-vous d\'affaires importants.',
       image: '/imgVoitureInterieur.webp',
       icon: (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -77,14 +101,16 @@ export default function ServicePresentation() {
   return (
     <section id="services" className="py-16 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
-            Nos Services
-          </h2>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            Un service de transport premium pour tous vos déplacements à Paris et en région parisienne
-          </p>
-        </div>
+        {!hideHeader && (
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+              Nos Services
+            </h2>
+            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+              Un service de transport premium pour tous vos déplacements à Paris et en région parisienne
+            </p>
+          </div>
+        )}
 
         {/* Services Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
@@ -98,10 +124,6 @@ export default function ServicePresentation() {
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
-                {/* Overlay avec icône */}
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-full p-3 text-blue-600">
-                  {service.icon}
-                </div>
               </div>
               
               {/* Contenu */}
@@ -109,9 +131,39 @@ export default function ServicePresentation() {
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {service.title}
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-600 mb-4">
                   {service.description}
                 </p>
+                
+                {/* Contenu étendu */}
+                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${
+                  expandedServices.includes(index) 
+                    ? 'max-h-96 opacity-100' 
+                    : 'max-h-0 opacity-0'
+                }`}>
+                  <p className="text-gray-600 mb-4 pt-2 border-t border-gray-100">
+                    {service.expandedContent}
+                  </p>
+                </div>
+                
+                {/* Bouton Voir plus/moins */}
+                <button
+                  onClick={() => toggleService(index)}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1 transition-colors duration-200"
+                >
+                  {expandedServices.includes(index) ? 'Voir moins' : 'Voir plus...'}
+                  <svg 
+                    className={`h-4 w-4 transition-transform duration-200 ${
+                      expandedServices.includes(index) ? 'rotate-180' : ''
+                    }`} 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    strokeWidth="1.5" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
               </div>
             </div>
           ))}
@@ -119,7 +171,7 @@ export default function ServicePresentation() {
 
         {/* Advantages */}
         <div className="bg-blue-50 rounded-2xl p-8 lg:p-12">
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
               Pourquoi nous choisir ?
             </h3>
@@ -128,20 +180,35 @@ export default function ServicePresentation() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {advantages.map((advantage, index) => (
-              <div key={index} className="flex items-center">
-                <svg className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">{advantage}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Image */}
+            <div className="relative">
+              <img
+                src="/imgMiseADispo.jpg"
+                alt="Chauffeur professionnel VTC"
+                className="w-full h-80 object-cover rounded-lg shadow-lg"
+                loading="lazy"
+              />
+            </div>
+            
+            {/* Avantages */}
+            <div>
+              <div className="grid grid-cols-1 gap-4">
+                {advantages.map((advantage, index) => (
+                  <div key={index} className="flex items-center">
+                    <svg className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-gray-700">{advantage}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
           
-          <div className="text-center mt-8">
+          <div className="text-center mt-12">
             <a
-              href="#reservation"
+              href="/reservation"
               className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Réserver maintenant

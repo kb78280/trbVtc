@@ -69,7 +69,7 @@ export default function ContactPage() {
                   </svg>
                   <div>
                     <h3 className="font-semibold text-gray-900">Téléphone</h3>
-                    <p className="text-gray-600">+33 1 23 45 67 89</p>
+                    <p className="text-gray-600">+33 7 85 65 84 63</p>
                     <p className="text-sm text-gray-500">Disponible 24h/24 - 7j/7</p>
                   </div>
                 </div>
@@ -80,7 +80,7 @@ export default function ContactPage() {
                   </svg>
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
-                    <p className="text-gray-600">contact@vtcparis.fr</p>
+                    <p className="text-gray-600">contact@vtc-transport-conciergerie.fr</p>
                     <p className="text-sm text-gray-500">Réponse sous 24h</p>
                   </div>
                 </div>
@@ -103,8 +103,8 @@ export default function ContactPage() {
                 <p className="text-gray-600 mb-4">
                   Pour une réservation immédiate, appelez-nous directement au :
                 </p>
-                <a href="tel:+33123456789" className="text-2xl font-bold text-blue-600">
-                  +33 1 23 45 67 89
+                <a href="tel:+33 7 85 65 84 63" className="text-2xl font-bold text-blue-600">
+                +33 7 85 65 84 63
                 </a>
               </div>
             </div>
