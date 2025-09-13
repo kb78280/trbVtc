@@ -15,7 +15,7 @@ const reservationSchema = z.object({
   serviceType: z.enum(['transfert', 'mise-a-disposition']),
   vehicleType: z.enum(['berline', 'van']),
   depart: z.string().min(1, 'Le lieu de départ est requis'),
-  arrivee: z.string().optional(),
+  arrivee: z.string().min(1, 'Le lieu d\'arrivée est requis'),
   duree: z.string().optional(),
   dateReservation: z.string().min(1, 'La date est requise'),
   heureReservation: z.string().min(1, 'L\'heure est requise'),
@@ -23,6 +23,11 @@ const reservationSchema = z.object({
   nom: z.string().min(1, 'Le nom est requis'),
   telephone: z.string().min(10, 'Le numéro de téléphone est requis'),
   email: z.string().email('L\'email n\'est pas valide'),
+  nombrePassagers: z.string().min(1, 'Le nombre de passagers est requis'),
+  nombreBagages: z.string().min(1, 'Le nombre de bagages est requis'),
+  siegeEnfantQuantite: z.string().optional(),
+  bouquetFleurs: z.boolean().optional(),
+  assistanceAeroport: z.boolean().optional(),
   commentaires: z.string().optional(),
   methodePaiement: z.enum(['immediate', 'sur-place']),
   accepteConditions: z.boolean().refine(val => val === true, 'Vous devez accepter les conditions')
@@ -40,6 +45,7 @@ export default function SecureReservationForm() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [csrfToken, setCsrfToken] = useState('')
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
 
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
@@ -110,6 +116,8 @@ export default function SecureReservationForm() {
       }
     } else {
       // Règle mise à disposition: 65€/h + 20% TVA + 1,45€ frais Stripe si paiement immédiat
+      if (!duree || duree <= 0) return null
+      
       const basePrice = duree * 65
       const tva = basePrice * 0.20
       const stripeFees = methodePaiement === 'immediate' ? 1.45 : 0
@@ -217,7 +225,7 @@ export default function SecureReservationForm() {
       const formData = {
         ...data,
         depart: departValueRef.current,
-        arrivee: serviceType === 'transfert' ? arriveeValueRef.current : '',
+        arrivee: arriveeValueRef.current,
         etapes: etapes.filter(e => e.value.trim()).map(e => e.value),
         estimatedPrice: priceBreakdown?.totalTTC || 0,
         csrfToken
@@ -436,48 +444,239 @@ export default function SecureReservationForm() {
                   />
                 </div>
 
-                {serviceType === 'transfert' ? (
-                  <div>
-                    <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
-                      Lieu d'arrivée *
-                    </label>
-                    <ArrivalAutocomplete
-                      key={arriveeKey}
-                      value=""
-                      onChange={(value, placeDetails, isAutocompleted) => {
-                        arriveeValueRef.current = value
-                        setIsArriveeAutocompleted(!!isAutocompleted)
-                        if (placeDetails) {
-                          setDestinationPlace(placeDetails)
-                        } else {
-                          // Reset si pas d'autocomplétion
-                          setDestinationPlace(null)
-                          setRouteInfo(null)
-                        }
-                      }}
-                    />
-                  </div>
-                ) : (
+                {/* Lieu d'arrivée - pour les deux services */}
+                <div>
+                  <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
+                    {serviceType === 'transfert' ? 'Lieu d\'arrivée *' : 'Lieu de fin de mise à disposition *'}
+                  </label>
+                  <ArrivalAutocomplete
+                    key={arriveeKey}
+                    value=""
+                    onChange={(value, placeDetails, isAutocompleted) => {
+                      arriveeValueRef.current = value
+                      setIsArriveeAutocompleted(!!isAutocompleted)
+                      if (placeDetails) {
+                        setDestinationPlace(placeDetails)
+                      } else {
+                        // Reset si pas d'autocomplétion
+                        setDestinationPlace(null)
+                        setRouteInfo(null)
+                      }
+                    }}
+                  />
+                </div>
+
+                {serviceType === 'mise-a-disposition' && (
                   <div>
                     <label htmlFor="duree" className="block text-sm font-medium text-gray-700 mb-1">
-                      Durée souhaitée *
+                      Durée souhaitée * (entre 2h et 24h)
                     </label>
-                    <select
-                      {...register('duree')}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="2">2 heures</option>
-                      <option value="3">3 heures</option>
-                      <option value="4">4 heures</option>
-                      <option value="6">6 heures</option>
-                      <option value="8">8 heures</option>
-                      <option value="12">12 heures</option>
-                    </select>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentValue = parseInt(watch('duree') || '2')
+                          if (currentValue > 2) {
+                            setValue('duree', (currentValue - 1).toString())
+                          }
+                        }}
+                        className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                        </svg>
+                      </button>
+                      <input
+                        {...register('duree')}
+                        type="number"
+                        min="2"
+                        max="24"
+                        defaultValue="2"
+                        className="w-20 text-center p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="2"
+                      />
+                      <span className="text-sm text-gray-600">heures</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentValue = parseInt(watch('duree') || '2')
+                          if (currentValue < 24) {
+                            setValue('duree', (currentValue + 1).toString())
+                          }
+                        }}
+                        className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* Étapes intermédiaires pour transfert */}
-                {serviceType === 'transfert' && (
+                {/* Section Options supplémentaires - Accordéon */}
+                <div className="border border-gray-200 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <span className="font-medium text-gray-900">Options supplémentaires</span>
+                    <svg 
+                      className={`w-5 h-5 text-gray-500 transform transition-transform ${isOptionsOpen ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {isOptionsOpen && (
+                    <div className="p-6 space-y-4 animate-fade-in">
+                      {/* Siège enfant */}
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative group">
+                            <h5 className="font-medium text-gray-900 flex items-center">
+                              Sièges enfants
+                              <span className="ml-2 text-blue-600 font-semibold">€10.00</span>
+                              <svg className="w-4 h-4 text-gray-400 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </h5>
+                            {/* Info-bulle */}
+                            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                              Siège auto pour bébé pour enfants de 0 à 36 mois.
+                              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 uppercase tracking-wide">Quantité</span>
+                          <select
+                            {...register('siegeEnfantQuantite')}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          >
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Bouquet de fleurs */}
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative group">
+                            <h5 className="font-medium text-gray-900 flex items-center">
+                              Bouquet de fleurs
+                              <span className="ml-2 text-blue-600 font-semibold">€75.00</span>
+                              <svg className="w-4 h-4 text-gray-400 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </h5>
+                            {/* Info-bulle */}
+                            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                              Un bouquet de fleurs de saison préparé par un fleuriste local.
+                              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 uppercase tracking-wide">Sélectionner</span>
+                          <input
+                            {...register('bouquetFleurs')}
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Assistance Aéroport */}
+                      <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative group">
+                            <h5 className="font-medium text-gray-900 flex items-center">
+                              Assistance Aéroport
+                              <span className="ml-2 text-blue-600 font-semibold">€120.00</span>
+                              <svg className="w-4 h-4 text-gray-400 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </h5>
+                            {/* Info-bulle */}
+                            <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                              Accompagnement tout au long de votre séjour à l'aéroport jusqu'au départ de votre avion.
+                              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 uppercase tracking-wide">Sélectionner</span>
+                          <input
+                            {...register('assistanceAeroport')}
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section Passagers et Bagages */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="nombrePassagers" className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre de passagers *
+                    </label>
+                    <select
+                      {...register('nombrePassagers')}
+                      defaultValue="1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="1">1 passager</option>
+                      <option value="2">2 passagers</option>
+                      <option value="3">3 passagers</option>
+                      {vehicleType === 'van' && (
+                        <>
+                          <option value="4">4 passagers</option>
+                          <option value="5">5 passagers</option>
+                          <option value="6">6 passagers</option>
+                          <option value="7">7 passagers</option>
+                          <option value="8">8 passagers</option>
+                        </>
+                      )}
+                    </select>
+                    {errors.nombrePassagers && (
+                      <p className="mt-1 text-sm text-red-600">{errors.nombrePassagers.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="nombreBagages" className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre de bagages *
+                    </label>
+                    <select
+                      {...register('nombreBagages')}
+                      defaultValue="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="0">Aucun bagage</option>
+                      <option value="1">1 bagage</option>
+                      <option value="2">2 bagages</option>
+                      <option value="3">3 bagages</option>
+                      <option value="4">4 bagages et plus</option>
+                    </select>
+                    {errors.nombreBagages && (
+                      <p className="mt-1 text-sm text-red-600">{errors.nombreBagages.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Étapes intermédiaires pour transfert - MASQUÉ TEMPORAIREMENT */}
+                {false && serviceType === 'transfert' && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-sm font-medium text-gray-700">
@@ -652,6 +851,8 @@ export default function SecureReservationForm() {
                   )}
                 </div>
               </div>
+
+              {/* Section Commentaires dans les informations personnelles */}
               <div className="mt-4">
                 <label htmlFor="commentaires" className="block text-sm font-medium text-gray-700 mb-1">
                   Commentaires (optionnel)
@@ -665,32 +866,6 @@ export default function SecureReservationForm() {
               </div>
             </div>
 
-            {/* Section 6: Prix estimé */}
-            {priceBreakdown && priceBreakdown.totalTTC > 0 && (
-              <div className="bg-blue-50 p-6 rounded-lg">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Prix estimé</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Prix de base:</span>
-                    <span>{priceBreakdown.basePrice.toFixed(2)}€</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>TVA ({serviceType === 'transfert' ? '10' : '20'}%):</span>
-                    <span>{priceBreakdown.tva.toFixed(2)}€</span>
-                  </div>
-                  {priceBreakdown.stripeFees > 0 && (
-                    <div className="flex justify-between">
-                      <span>Frais de paiement:</span>
-                      <span>{priceBreakdown.stripeFees.toFixed(2)}€</span>
-                    </div>
-                  )}
-                  <div className="border-t pt-2 flex justify-between font-semibold">
-                    <span>Total TTC:</span>
-                    <span>{priceBreakdown.totalTTC.toFixed(2)}€</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Section 7: Méthode de paiement */}
             <div>
@@ -743,9 +918,17 @@ export default function SecureReservationForm() {
 
               {methodePaiement === 'immediate' && (!priceBreakdown || priceBreakdown.totalTTC === 0) && (
                 <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-yellow-800 text-sm">
-                    Veuillez remplir les informations de trajet pour voir le formulaire de paiement.
-                  </p>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <p className="text-yellow-800 text-sm">
+                      {serviceType === 'transfert' 
+                        ? 'Veuillez remplir les adresses de départ et d\'arrivée pour calculer le prix.'
+                        : 'Veuillez remplir les adresses de départ, d\'arrivée et la durée pour calculer le prix.'
+                      }
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
