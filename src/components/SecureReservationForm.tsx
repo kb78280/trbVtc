@@ -8,6 +8,7 @@ import DepartureAutocomplete from './DepartureAutocomplete'
 import ArrivalAutocomplete from './ArrivalAutocomplete'
 import EtapeAutocomplete from './EtapeAutocomplete'
 import InteractiveMap from './InteractiveMap'
+import StripePaymentForm from './StripePaymentForm'
 
 const reservationSchema = z.object({
   serviceType: z.enum(['transfert', 'mise-a-disposition']),
@@ -42,6 +43,9 @@ export default function SecureReservationForm() {
   const [baggageCount, setBaggageCount] = useState<number>(0)
   const [minDate, setMinDate] = useState<string>('2025-09-21')
   const [paymentMethod, setPaymentMethod] = useState<'immediate' | 'sur-place' | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState<number>(5000) // 50€ par défaut en centimes
+  const [paymentError, setPaymentError] = useState<string>('')
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false)
 
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
@@ -91,12 +95,29 @@ export default function SecureReservationForm() {
     }
   })
 
+  // Navigation entre les étapes avec ancres (mobile-first)
+  const scrollToFormSection = () => {
+    const formElement = document.getElementById('reservation-form')
+    if (formElement) {
+      // Mobile-first : scroll avec offset pour les barres de navigation mobiles
+      const offset = window.innerWidth < 768 ? 80 : 100
+      const elementPosition = formElement.offsetTop - offset
+      
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      })
+    }
+  }
+
   // Fonction pour gérer les transitions entre étapes
   const goToNextStep = useCallback(() => {
     setIsTransitioning(true)
     setTimeout(() => {
       setCurrentStep(prev => prev + 1)
       setIsTransitioning(false)
+      // ✅ Scroll vers le formulaire après changement d'étape
+      setTimeout(scrollToFormSection, 100)
     }, 300)
   }, [])
 
@@ -105,6 +126,8 @@ export default function SecureReservationForm() {
     setTimeout(() => {
       setCurrentStep(prev => prev - 1)
       setIsTransitioning(false)
+      // ✅ Scroll vers le formulaire après changement d'étape
+      setTimeout(scrollToFormSection, 100)
     }, 300)
   }, [])
 
@@ -173,13 +196,38 @@ export default function SecureReservationForm() {
     setValue('vehicleType', type)
     // Réinitialiser le nombre de passagers à 1 pour les deux types
     setPassengerCount(1)
+    // Mettre à jour le montant selon le type de véhicule
+    const baseAmount = type === 'berline' ? 5000 : 8000 // 50€ ou 80€ en centimes
+    setPaymentAmount(baseAmount)
+  }
+
+  // Gestion du succès de paiement Stripe
+  const handlePaymentSuccess = () => {
+    setPaymentSuccess(true)
+    setPaymentError('')
+    console.log('✅ Paiement réussi !')
+    // Ici vous pouvez traiter la réservation payée
+    alert('🎉 Paiement réussi ! Votre réservation est confirmée.')
+  }
+
+  // Gestion des erreurs de paiement Stripe
+  const handlePaymentError = (error: string) => {
+    setPaymentError(error)
+    setPaymentSuccess(false)
+    console.error('❌ Erreur de paiement:', error)
   }
 
   // Soumission du formulaire
   const onSubmit = async (data: ReservationFormData) => {
     console.log('Données du formulaire:', data)
-    // Ici vous pouvez traiter la soumission
-    alert('Réservation envoyée !')
+    
+    if (paymentMethod === 'sur-place') {
+      // Paiement plus tard - confirmer directement
+      alert('✅ Réservation confirmée ! Vous paierez sur place.')
+    } else if (paymentMethod === 'immediate') {
+      // Paiement immédiat - le paiement sera géré par Stripe
+      console.log('💳 Paiement immédiat - géré par Stripe')
+    }
   }
 
 
@@ -219,10 +267,36 @@ export default function SecureReservationForm() {
             </div>
           </div>
 
-        <div className={`bg-white rounded-lg shadow-md p-8 transition-opacity duration-300 ${
+        <div className={`bg-white rounded-lg shadow-md p-4 sm:p-8 transition-opacity duration-300 ${
           isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          {/* Indicateur d'étapes mobile-first */}
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Étape {currentStep} sur 3
+              </h2>
+              <div className="text-sm text-gray-500">
+                {currentStep === 1 && "📍 Trajet"}
+                {currentStep === 2 && "👤 Informations"}
+                {currentStep === 3 && "💳 Paiement"}
+              </div>
+            </div>
+            
+            {/* Barre de progression mobile-first */}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(currentStep / 3) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+
+          <form 
+            id="reservation-form" 
+            onSubmit={handleSubmit(onSubmit)} 
+            className="space-y-6 sm:space-y-8"
+          >
             
             {/* ÉTAPE 1: Sélection du service et trajet */}
             {currentStep === 1 && (
@@ -649,20 +723,20 @@ export default function SecureReservationForm() {
                   
 
                   
-                {/* Bouton Continuer */}
-                <div className="flex justify-end pt-6">
-                    <button
-                      type="button"
+                {/* Bouton Continuer - Mobile first */}
+                <div className="flex justify-center sm:justify-end pt-6">
+                  <button
+                    type="button"
                     onClick={goToNextStep}
                     disabled={!validateStep1()}
-                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                    className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
                       validateStep1()
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105 shadow-lg hover:shadow-xl'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                   >
-                    Continuer la réservation
-                    </button>
+                    📍 Continuer la réservation
+                  </button>
                 </div>
               </div>
             )}
@@ -796,26 +870,26 @@ export default function SecureReservationForm() {
                   />
               </div>
 
-                {/* Boutons */}
-                <div className="flex justify-between pt-6">
+                {/* Boutons - Mobile first */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
                   <button
                     type="button"
                     onClick={goToPreviousStep}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all duration-300 order-2 sm:order-1"
                   >
-                    Retour
+                    ← Retour
                   </button>
                   <button
                     type="button"
                     onClick={goToNextStep}
                     disabled={!validateStep2()}
-                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                    className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
                       validateStep2()
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105 shadow-lg hover:shadow-xl'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                   >
-                    Réserver
+                    👤 Continuer vers le paiement
                   </button>
             </div>
               </div>
@@ -912,15 +986,53 @@ export default function SecureReservationForm() {
                     <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
                       🔒 Paiement sécurisé
                     </h4>
-                    <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm">
-                      <div className="text-center text-blue-600 font-medium mb-4">
-                        💳 Formulaire de carte bancaire Stripe
-                      </div>
-                      <div className="text-sm text-gray-600 text-center">
-                        Le composant Stripe sera intégré ici<br/>
-                        <span className="text-xs opacity-75">Paiement 100% sécurisé et crypté</span>
+                    
+                    {/* Affichage du montant */}
+                    <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-900 mb-1">
+                          {(paymentAmount / 100).toFixed(2)} €
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Montant à payer
+                        </div>
                       </div>
                     </div>
+
+                    {/* Messages d'erreur */}
+                    {paymentError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <span>❌</span>
+                          <span className="font-medium">Erreur de paiement</span>
+                        </div>
+                        <div className="text-red-600 text-sm mt-1">{paymentError}</div>
+                      </div>
+                    )}
+
+                    {/* Message de succès */}
+                    {paymentSuccess && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <span>✅</span>
+                          <span className="font-medium">Paiement réussi !</span>
+                        </div>
+                        <div className="text-green-600 text-sm mt-1">
+                          Votre réservation a été confirmée.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Composant Stripe */}
+                    {!paymentSuccess && (
+                      <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm">
+                        <StripePaymentForm
+                          amount={paymentAmount}
+                          onSuccess={handlePaymentSuccess}
+                          onError={handlePaymentError}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -942,25 +1054,29 @@ export default function SecureReservationForm() {
                   )}
                 </div>
                 
-                {/* Boutons */}
-                <div className="flex justify-between pt-6">
+                {/* Boutons - Mobile first */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
                   <button
                     type="button"
                     onClick={goToPreviousStep}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all duration-300 order-2 sm:order-1"
                   >
-                    Retour
+                    ← Retour
                   </button>
             <button
-              type="submit"
-              disabled={!validateStep3()}
-              className={`px-8 py-3 rounded-lg font-medium transition-all duration-300 ${
-                validateStep3()
+              type={paymentMethod === 'sur-place' ? 'submit' : 'button'}
+              disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)}
+              onClick={paymentMethod === 'immediate' && !paymentSuccess ? undefined : undefined}
+              className={`w-full sm:w-auto px-8 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
+                validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess)
                   ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {paymentMethod === 'immediate' ? '💳 Payer et confirmer' : '✅ Confirmer la réservation'}
+              {paymentMethod === 'immediate' 
+                ? (paymentSuccess ? '✅ Réservation confirmée' : '💳 Effectuez le paiement ci-dessus')
+                : '✅ Confirmer la réservation'
+              }
             </button>
             </div>
               </div>

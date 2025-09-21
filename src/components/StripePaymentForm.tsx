@@ -37,8 +37,9 @@ const CheckoutForm = ({ amount, onSuccess, onError }: StripeCheckoutFormProps) =
     setIsProcessing(true)
 
     try {
-      const { error } = await stripe.confirmPayment({
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
+        redirect: 'if_required', // ✅ Éviter la redirection automatique
         confirmParams: {
           return_url: `${window.location.origin}/confirmation`,
         },
@@ -46,8 +47,11 @@ const CheckoutForm = ({ amount, onSuccess, onError }: StripeCheckoutFormProps) =
 
       if (error) {
         onError(error.message || 'Une erreur est survenue lors du paiement.')
-      } else {
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // ✅ Paiement réussi sans redirection
         onSuccess()
+      } else {
+        onError('Le paiement n\'a pas pu être confirmé.')
       }
     } catch (e) {
       onError('Une erreur inattendue est survenue.')
