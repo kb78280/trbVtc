@@ -40,7 +40,8 @@ export default function SecureReservationForm() {
   const [vehicleType, setVehicleType] = useState<'berline' | 'van'>('berline')
   const [passengerCount, setPassengerCount] = useState<number>(1)
   const [baggageCount, setBaggageCount] = useState<number>(0)
-  const [minDate, setMinDate] = useState<string>('2025-09-21')
+  const [minDate, setMinDate] = useState<string>('')
+  const [isClient, setIsClient] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'immediate' | 'sur-place' | null>(null)
   const [paymentAmount, setPaymentAmount] = useState<number>(5000) // 50€ par défaut en centimes
   const [paymentError, setPaymentError] = useState<string>('')
@@ -50,11 +51,15 @@ export default function SecureReservationForm() {
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
   const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
 
-  // Mettre à jour la date minimum côté client
+  // Initialisation côté client pour éviter l'hydratation mismatch
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setMinDate(new Date().toISOString().split('T')[0])
-    }
+    setIsClient(true)
+    // Utiliser une date fixe pour éviter les problèmes de fuseau horaire avec VPN
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    setMinDate(`${year}-${month}-${day}`)
   }, [])
   
   // Références pour les valeurs d'adresses
@@ -411,7 +416,7 @@ export default function SecureReservationForm() {
                     <input
                       {...register('dateReservation')}
                       type="date"
-                      min={minDate}
+                      min={isClient ? minDate : undefined}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     />
                     {errors.dateReservation && (

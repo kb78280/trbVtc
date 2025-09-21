@@ -20,8 +20,15 @@ export default function InteractiveMap({
 }: InteractiveMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string>('')
+  const [isClient, setIsClient] = useState(false)
+
+  // Protection contre l'hydratation mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   useEffect(() => {
+    if (!isClient) return
     let isMounted = true
     
     const initMap = async () => {
@@ -111,7 +118,22 @@ export default function InteractiveMap({
     return () => {
       isMounted = false
     }
-  }, [origin, destination])
+  }, [isClient, origin, destination])
+
+  // Affichage pendant l'hydratation
+  if (!isClient) {
+    return (
+      <div 
+        className={`flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-lg ${className}`}
+        style={{ height }}
+      >
+        <div className="text-center p-4">
+          <div className="text-blue-600 font-medium mb-2">🗺️ Chargement de la carte</div>
+          <div className="text-blue-500 text-sm">Initialisation en cours...</div>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (

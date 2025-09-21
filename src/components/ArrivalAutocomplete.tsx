@@ -27,16 +27,22 @@ export default function ArrivalAutocomplete({
   const [isLoaded, setIsLoaded] = useState(false)
   const [error, setError] = useState('')
   const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
- // Protection pendant sélection
   const [isAutocompleted, setIsAutocompleted] = useState(false) // Suivi de l'état d'autocomplétion
+  const [isClient, setIsClient] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+
+  // Protection contre l'hydratation mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // AUCUNE synchronisation externe - complètement isolé
   // Le composant gère son propre état sans écouter les props
 
   useEffect(() => {
+    if (!isClient) return
     const initializeAutocomplete = async () => {
       try {
         await googleMapsService.loadGoogleMaps()
@@ -98,7 +104,7 @@ export default function ArrivalAutocomplete({
         google.maps.event.clearInstanceListeners(autocompleteRef.current)
       }
     }
-  }, [onChange, onError])
+  }, [isClient, onChange, onError])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
