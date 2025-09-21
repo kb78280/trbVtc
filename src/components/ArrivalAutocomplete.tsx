@@ -147,10 +147,11 @@ export default function ArrivalAutocomplete({
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         placeholder="Tapez votre adresse d'arrivée..."
-        className={`w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${className}`}
+        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${className}`}
         required={required}
         disabled={disabled || !isLoaded}
         autoComplete="off"
+        suppressHydrationWarning
       />
       
       {!isLoaded && (
