@@ -1,0 +1,16 @@
+58:10  Warning: 'nextEtapeId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+58:23  Warning: 'setNextEtapeId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+72:10  Warning: 'isDepartAutocompleted' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+73:10  Warning: 'isArriveeAutocompleted' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+79:21  Warning: 'setDepartKey' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+87:5  Warning: 'reset' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+./src/components/SimpleMap.tsx
+158:66  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+./src/components/StripePaymentForm.tsx
+55:14  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+./src/lib/database.ts
+31:40  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+33:11  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+126:49  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+Error: Command "npm run build" exited with 1

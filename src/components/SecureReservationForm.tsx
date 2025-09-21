@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import DepartureAutocomplete from './DepartureAutocomplete'
 import ArrivalAutocomplete from './ArrivalAutocomplete'
-import EtapeAutocomplete from './EtapeAutocomplete'
 import InteractiveMap from './InteractiveMap'
 import StripePaymentForm from './StripePaymentForm'
 
@@ -50,12 +49,6 @@ export default function SecureReservationForm() {
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
   const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
-  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
-  
-  // États pour les étapes
-  const [etapes, setEtapes] = useState<Array<{id: number, value: string}>>([{id: 0, value: ''}])
-  const [etapesPlaces, setEtapesPlaces] = useState<Array<google.maps.places.PlaceResult | null>>([null])
-  const [nextEtapeId, setNextEtapeId] = useState(1)
 
   // Mettre à jour la date minimum côté client
   useEffect(() => {
@@ -68,15 +61,11 @@ export default function SecureReservationForm() {
   const departValueRef = useRef('')
   const arriveeValueRef = useRef('')
   
-  // États pour l'autocomplete
-  const [isDepartAutocompleted, setIsDepartAutocompleted] = useState(false)
-  const [isArriveeAutocompleted, setIsArriveeAutocompleted] = useState(false)
-  
   // État pour contrôler l'interface (départ rempli ou non)
   const [hasDepartureAddress, setHasDepartureAddress] = useState(false)
   
   // Clés pour forcer le re-render des autocomplete
-  const [departKey, setDepartKey] = useState(0)
+  const [departKey] = useState(0)
   const [arriveeKey, setArriveeKey] = useState(0)
 
   const {
@@ -84,7 +73,6 @@ export default function SecureReservationForm() {
     handleSubmit,
     watch,
     setValue,
-    reset,
     formState: { errors }
   } = useForm<ReservationFormData>({
     resolver: zodResolver(reservationSchema),
@@ -155,11 +143,8 @@ export default function SecureReservationForm() {
     if (type === 'transfert') {
       setValue('arrivee', '')
       arriveeValueRef.current = ''
-      setIsArriveeAutocompleted(false)
       setDestinationPlace(null)
     }
-    
-    setRouteInfo(null)
   }
 
   // Gérer le changement de type de véhicule
@@ -275,12 +260,10 @@ export default function SecureReservationForm() {
                     <InteractiveMap
                       origin={originPlace || undefined}
                       destination={destinationPlace || undefined}
-                      validWaypoints={etapes.filter(e => e.value.trim()).map((_, index) => etapesPlaces[index]).filter((place): place is google.maps.places.PlaceResult => place !== null && place !== undefined)}
                       height="256px"
                       className="w-full h-full"
                       onRouteCalculated={(distance: string, duration: string) => {
                         console.log('Route calculée:', { distance, duration })
-    setRouteInfo({ distance, duration })
                       }}
                     />
             </div>
@@ -293,9 +276,8 @@ export default function SecureReservationForm() {
                   <DepartureAutocomplete
                     key={departKey}
                     value=""
-                    onChange={(value, placeDetails, isAutocompleted) => {
+                    onChange={(value, placeDetails) => {
                       departValueRef.current = value
-                      setIsDepartAutocompleted(!!isAutocompleted)
                       
                       // Mettre à jour l'état pour contrôler l'interface
                       setHasDepartureAddress(value.trim().length > 0)
@@ -308,7 +290,6 @@ export default function SecureReservationForm() {
                       // Si on vide le départ, vider aussi l'arrivée
                       if (!value.trim()) {
                         arriveeValueRef.current = ''
-                        setIsArriveeAutocompleted(false)
                         setDestinationPlace(null)
                         setArriveeKey(prev => prev + 1) // Forcer le re-render de l'arrivée
                       }
@@ -324,7 +305,7 @@ export default function SecureReservationForm() {
                   <ArrivalAutocomplete
                     key={arriveeKey}
                       value=""
-                    onChange={(value, placeDetails, isAutocompleted) => {
+                    onChange={(value, placeDetails) => {
                         // Ne pas permettre la saisie si le départ n'est pas rempli
                         if (!hasDepartureAddress) {
                           console.log('❌ Impossible de saisir l\'arrivée sans départ')
@@ -332,7 +313,6 @@ export default function SecureReservationForm() {
                         }
                         
                       arriveeValueRef.current = value
-                      setIsArriveeAutocompleted(!!isAutocompleted)
                         if (placeDetails) {
                         setDestinationPlace(placeDetails)
                           console.log('🎯 Destination mise à jour:', placeDetails.formatted_address)

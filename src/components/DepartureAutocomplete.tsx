@@ -27,8 +27,7 @@ export default function DepartureAutocomplete({
   const [isLoaded, setIsLoaded] = useState(false)
   const [error, setError] = useState('')
   const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [isSelecting, setIsSelecting] = useState(false) // Protection pendant sélection
+ // Protection pendant sélection
   const [isAutocompleted, setIsAutocompleted] = useState(false) // Suivi de l'état d'autocomplétion
   
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,7 +46,6 @@ export default function DepartureAutocomplete({
           autocompleteRef.current = autocomplete
 
           autocomplete.addListener('place_changed', () => {
-            setIsSelecting(true) // Marquer qu'on est en sélection
             const place = autocomplete.getPlace()
             
             console.log('[DEPART] Place changed:', {
@@ -61,7 +59,6 @@ export default function DepartureAutocomplete({
               console.warn('[DEPART] Invalid place selected')
               setError('Adresse de départ non trouvée. Veuillez sélectionner une suggestion.')
               onError?.('Adresse non trouvée')
-              setIsSelecting(false)
               return
             }
 
@@ -79,15 +76,12 @@ export default function DepartureAutocomplete({
               onChange(formattedAddress, place, true) // Indiquer que c'est autocompléé
               
               setTimeout(() => {
-                setIsSelecting(false)
               }, 100)
             } else {
-              setIsSelecting(false)
             }
           })
 
           setIsLoaded(true)
-          setIsInitialized(true)
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Erreur de chargement Google Maps'

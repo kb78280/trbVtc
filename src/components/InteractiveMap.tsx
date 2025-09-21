@@ -6,8 +6,6 @@ import { googleMapsService } from '@/lib/googleMaps'
 interface InteractiveMapProps {
   origin?: google.maps.places.PlaceResult
   destination?: google.maps.places.PlaceResult
-  waypoints?: string[]
-  validWaypoints?: google.maps.places.PlaceResult[]
   height?: string
   className?: string
   onRouteCalculated?: (distance: string, duration: string) => void
@@ -16,8 +14,6 @@ interface InteractiveMapProps {
 export default function InteractiveMap({
   origin,
   destination,
-  waypoints = [],
-  validWaypoints = [],
   height = '400px',
   className = '',
   onRouteCalculated
@@ -84,7 +80,7 @@ export default function InteractiveMap({
           })
         }
         
-      } catch (err) {
+      } catch {
         setError('Erreur lors du chargement de Google Maps')
         
         // Afficher un placeholder en cas d'erreur

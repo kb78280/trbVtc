@@ -155,7 +155,7 @@ export default function SimpleMap({ departPlace, arriveePlace, onRouteCalculated
     } else {
       // Pas d'arrivée, effacer la route
       if (routeRendererRef.current) {
-        routeRendererRef.current.setDirections({ routes: [] } as any)
+        routeRendererRef.current.setDirections({ routes: [] } as unknown as google.maps.DirectionsResult)
       }
       // Effacer les informations de route
       if (onRouteCalculated) {

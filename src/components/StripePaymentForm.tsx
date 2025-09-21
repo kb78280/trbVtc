@@ -52,7 +52,7 @@ const CheckoutForm = ({ amount, onSuccess, onError }: StripeCheckoutFormProps) =
       } else {
         onError('Le paiement n\'a pas pu être confirmé.')
       }
-    } catch (e) {
+    } catch {
       onError('Une erreur inattendue est survenue.')
     }
 

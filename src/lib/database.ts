@@ -28,9 +28,9 @@ export function getPool(): mysql.Pool {
 }
 
 // Fonction pour exécuter une requête
-export async function executeQuery<T = any>(
+export async function executeQuery<T = unknown>(
   query: string, 
-  params: any[] = []
+  params: unknown[] = []
 ): Promise<T[]> {
   try {
     const pool = getPool()
@@ -123,7 +123,7 @@ export async function insertReservation(data: {
       data.passenger_count, data.baggage_count, data.payment_method, data.comments, data.estimated_price
     ])
     
-    const reservationId = (reservationResult as any).insertId
+    const reservationId = (reservationResult as { insertId: number }).insertId
     console.log('✅ [DATABASE] Réservation insérée avec ID:', reservationId)
     
     // 2. Insérer les informations client
@@ -217,7 +217,7 @@ export async function getReservationComplete(reservationId: number) {
       'SELECT * FROM reservation_complete WHERE id = ?',
       [reservationId]
     )
-    return rows[0] || null
+    return (rows as unknown[])[0] || null
   } catch (error) {
     console.error('❌ [DATABASE] Erreur lors de la récupération de la réservation:', error)
     throw error
