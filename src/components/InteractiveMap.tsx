@@ -26,27 +26,16 @@ export default function InteractiveMap({
   const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    console.log('🗺️ [MAP] Initialisation avec googleMapsService...')
-    
-    // 🛡️ PROTECTION ANTI-BOUCLE INFINIE
     let isMounted = true
     
     const initMap = async () => {
       if (!mapRef.current || !isMounted) {
-        console.log('🗺️ [MAP] Élément DOM non disponible ou composant démonté')
         return
       }
 
       try {
-        console.log('🗺️ [MAP] Chargement de Google Maps via googleMapsService...')
-        
-        // ✅ SOLUTION PROPRE : Utiliser googleMapsService comme les autres composants
         await googleMapsService.loadGoogleMaps()
-        
-        console.log('🗺️ [MAP] Création de la carte avec googleMapsService...')
         const map = googleMapsService.createMap(mapRef.current)
-        
-        console.log('🗺️ [MAP] ✅ Carte créée avec succès !')
         
         // Créer les services de directions
         const directionsService = googleMapsService.createDirectionsService()
@@ -56,11 +45,6 @@ export default function InteractiveMap({
         // Gérer l'affichage selon les adresses disponibles
         if (origin && destination && origin.geometry && destination.geometry) {
           // Cas 3: Départ ET arrivée - calculer l'itinéraire
-          console.log('🗺️ [MAP] 🛣️ Calcul de l\'itinéraire:', {
-            origin: origin.formatted_address,
-            destination: destination.formatted_address
-          })
-          
           const request = {
             origin: origin.geometry.location!,
             destination: destination.geometry.location!,
@@ -80,20 +64,15 @@ export default function InteractiveMap({
                 const distance = leg.distance?.text || 'N/A'
                 const duration = leg.duration?.text || 'N/A'
                 
-                console.log('🗺️ [MAP] ✅ Itinéraire calculé:', { distance, duration })
-                // 🛡️ VÉRIFICATION AVANT CALLBACK
                 if (isMounted && onRouteCalculated) {
                   onRouteCalculated(distance, duration)
                 }
               }
-            } else {
-              console.error('🗺️ [MAP] ❌ Erreur calcul itinéraire:', status)
             }
           })
           
         } else if (origin && origin.geometry && origin.geometry.location) {
           // Cas 2: Seulement le départ - centrer sur le départ avec marqueur
-          console.log('🗺️ [MAP] 📍 Centrage sur l\'origine:', origin.formatted_address)
           map.setCenter(origin.geometry.location)
           map.setZoom(15)
           
@@ -106,7 +85,6 @@ export default function InteractiveMap({
         }
         
       } catch (err) {
-        console.error('🗺️ [MAP] ❌ Erreur lors de l\'initialisation:', err)
         setError('Erreur lors du chargement de Google Maps')
         
         // Afficher un placeholder en cas d'erreur
@@ -134,12 +112,10 @@ export default function InteractiveMap({
 
     initMap()
     
-    // 🛡️ CLEANUP POUR ÉVITER LES FUITES MÉMOIRE
     return () => {
       isMounted = false
-      console.log('🗺️ [MAP] 🧹 Nettoyage du composant')
     }
-  }, [origin, destination]) // ❌ SUPPRIMÉ onRouteCalculated des dépendances !
+  }, [origin, destination])
 
   if (error) {
     return (

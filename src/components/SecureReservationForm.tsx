@@ -95,11 +95,9 @@ export default function SecureReservationForm() {
     }
   })
 
-  // Navigation entre les étapes avec ancres (mobile-first)
   const scrollToFormSection = () => {
     const formElement = document.getElementById('reservation-form')
     if (formElement) {
-      // Mobile-first : scroll avec offset pour les barres de navigation mobiles
       const offset = window.innerWidth < 768 ? 80 : 100
       const elementPosition = formElement.offsetTop - offset
       
@@ -109,14 +107,11 @@ export default function SecureReservationForm() {
       })
     }
   }
-
-  // Fonction pour gérer les transitions entre étapes
   const goToNextStep = useCallback(() => {
     setIsTransitioning(true)
     setTimeout(() => {
       setCurrentStep(prev => prev + 1)
       setIsTransitioning(false)
-      // ✅ Scroll vers le formulaire après changement d'étape
       setTimeout(scrollToFormSection, 100)
     }, 300)
   }, [])
@@ -126,40 +121,19 @@ export default function SecureReservationForm() {
     setTimeout(() => {
       setCurrentStep(prev => prev - 1)
       setIsTransitioning(false)
-      // ✅ Scroll vers le formulaire après changement d'étape
       setTimeout(scrollToFormSection, 100)
     }, 300)
   }, [])
 
-  // Validation de l'étape 1
   const validateStep1 = () => {
-    // Vérifier les adresses via les PlaceResult (plus fiable que les refs)
     const hasValidAddresses = originPlace && destinationPlace
-    
-    // Vérifier date et heure
     const hasDateTime = watch('dateReservation') && watch('heureReservation')
-    
-    // Vérifier les sélections obligatoires
     const hasServiceType = serviceType
     const hasVehicleType = vehicleType
-    
-    console.log('🔍 [VALIDATION] État de la validation:', {
-      hasValidAddresses: !!hasValidAddresses,
-      originPlace: originPlace?.formatted_address,
-      destinationPlace: destinationPlace?.formatted_address,
-      hasDateTime,
-      dateReservation: watch('dateReservation'),
-      heureReservation: watch('heureReservation'),
-      hasServiceType,
-      hasVehicleType,
-      serviceType,
-      vehicleType
-    })
     
     return hasValidAddresses && hasDateTime && hasServiceType && hasVehicleType
   }
 
-  // Validation de l'étape 2
   const validateStep2 = () => {
     const prenom = watch('prenom')
     const nom = watch('nom')
@@ -169,13 +143,11 @@ export default function SecureReservationForm() {
     return prenom && nom && telephone && email
   }
 
-  // Validation de l'étape 3
   const validateStep3 = () => {
     const accepteConditions = watch('accepteConditions')
     return paymentMethod && accepteConditions
   }
 
-  // Gérer le changement de type de service
   const handleServiceTypeChange = (type: 'transfert' | 'mise-a-disposition') => {
     setServiceType(type)
     setValue('serviceType', type)
@@ -243,7 +215,6 @@ export default function SecureReservationForm() {
           </p>
             </div>
 
-        {/* Indicateur d'étapes */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-4">
             {[1, 2, 3].map((step) => (
@@ -270,7 +241,6 @@ export default function SecureReservationForm() {
         <div className={`bg-white rounded-lg shadow-md p-4 sm:p-8 transition-opacity duration-300 ${
           isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
-          {/* Indicateur d'étapes mobile-first */}
           <div className="mb-6 sm:mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -283,7 +253,6 @@ export default function SecureReservationForm() {
               </div>
             </div>
             
-            {/* Barre de progression mobile-first */}
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
@@ -298,10 +267,8 @@ export default function SecureReservationForm() {
             className="space-y-6 sm:space-y-8"
           >
             
-            {/* ÉTAPE 1: Sélection du service et trajet */}
             {currentStep === 1 && (
               <div className="space-y-6">
-                {/* 1. La map */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Carte du trajet</h3>
                   <div className="h-64 rounded-lg border border-gray-300 overflow-hidden">
@@ -319,7 +286,6 @@ export default function SecureReservationForm() {
             </div>
           </div>
 
-                {/* 2. Lieu de départ */}
                 <div>
                   <label htmlFor="depart" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu de départ *
@@ -350,7 +316,6 @@ export default function SecureReservationForm() {
                   />
                 </div>
 
-                {/* 3. Lieu d'arrivée */}
                 <div>
                   <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu d'arrivée *
@@ -377,7 +342,6 @@ export default function SecureReservationForm() {
             </div>
                 </div>
 
-                {/* 4. Type de service */}
                   <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     <span className="flex items-center gap-2">
@@ -459,7 +423,6 @@ export default function SecureReservationForm() {
                   </div>
                 </div>
 
-                {/* 5. Date et heure côte à côte */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="dateReservation" className="block text-sm font-medium text-gray-700 mb-1">
@@ -491,9 +454,7 @@ export default function SecureReservationForm() {
                   </div>
                 </div>
 
-                {/* 6. Passagers, Bagages et Durée côte à côte */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Nombre de passagers */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de passagers *
@@ -539,7 +500,6 @@ export default function SecureReservationForm() {
                     </p>
                   </div>
 
-                  {/* Nombre de bagages */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de bagages
@@ -584,7 +544,6 @@ export default function SecureReservationForm() {
                     </p>
                   </div>
 
-                  {/* Durée (seulement pour mise à disposition) */}
                   {serviceType === 'mise-a-disposition' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -639,7 +598,6 @@ export default function SecureReservationForm() {
             </div>
 
 
-                {/* 7. Type de véhicule */}
                 <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     <span className="flex items-center gap-2">
@@ -723,7 +681,6 @@ export default function SecureReservationForm() {
                   
 
                   
-                {/* Bouton Continuer - Mobile first */}
                 <div className="flex justify-center sm:justify-end pt-6">
                   <button
                     type="button"
@@ -741,10 +698,8 @@ export default function SecureReservationForm() {
               </div>
             )}
 
-            {/* ÉTAPE 2: Informations utilisateur et options */}
             {currentStep === 2 && (
               <div className="space-y-6">
-            {/* Informations personnelles */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Vos informations</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -811,7 +766,6 @@ export default function SecureReservationForm() {
             </div>
 
 
-                {/* Options supplémentaires */}
                       <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Options supplémentaires</h3>
                   <div className="space-y-4">
@@ -857,7 +811,6 @@ export default function SecureReservationForm() {
                   </div>
                 </div>
 
-                {/* Commentaires */}
                 <div>
                   <label htmlFor="commentaires" className="block text-sm font-medium text-gray-700 mb-1">
                     Commentaires (optionnel)
@@ -870,7 +823,6 @@ export default function SecureReservationForm() {
                   />
               </div>
 
-                {/* Boutons - Mobile first */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
                   <button
                     type="button"
@@ -895,7 +847,6 @@ export default function SecureReservationForm() {
               </div>
             )}
 
-            {/* ÉTAPE 3: Choix de paiement */}
             {currentStep === 3 && (
               <div className="space-y-8">
                 <div className="text-center">
@@ -903,9 +854,7 @@ export default function SecureReservationForm() {
                   <p className="text-gray-600">Choisissez votre mode de paiement préféré</p>
                 </div>
 
-                {/* Options de paiement modernes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Payer maintenant */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('immediate')}
@@ -942,7 +891,6 @@ export default function SecureReservationForm() {
                     )}
                   </button>
 
-                  {/* Payer plus tard */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('sur-place')}
@@ -980,14 +928,12 @@ export default function SecureReservationForm() {
                   </button>
                 </div>
 
-                {/* Formulaire Stripe - Affiché seulement si "Payer maintenant" */}
                 {paymentMethod === 'immediate' && (
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200">
                     <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
                       🔒 Paiement sécurisé
                     </h4>
                     
-                    {/* Affichage du montant */}
                     <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-4">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-900 mb-1">
@@ -999,7 +945,6 @@ export default function SecureReservationForm() {
                       </div>
                     </div>
 
-                    {/* Messages d'erreur */}
                     {paymentError && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                         <div className="flex items-center gap-2 text-red-800">
@@ -1010,7 +955,6 @@ export default function SecureReservationForm() {
                       </div>
                     )}
 
-                    {/* Message de succès */}
                     {paymentSuccess && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                         <div className="flex items-center gap-2 text-green-800">
@@ -1023,7 +967,6 @@ export default function SecureReservationForm() {
                       </div>
                     )}
 
-                    {/* Composant Stripe */}
                     {!paymentSuccess && (
                       <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm">
                         <StripePaymentForm
@@ -1036,7 +979,6 @@ export default function SecureReservationForm() {
                   </div>
                 )}
 
-                {/* Conditions */}
                 <div className="border-t pt-6">
                   <label className="flex items-start space-x-3">
                     <input
@@ -1054,7 +996,6 @@ export default function SecureReservationForm() {
                   )}
                 </div>
                 
-                {/* Boutons - Mobile first */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
                   <button
                     type="button"
