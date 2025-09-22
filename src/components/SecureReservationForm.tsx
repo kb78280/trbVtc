@@ -140,7 +140,16 @@ export default function SecureReservationForm() {
 
   const validateStep3 = () => {
     const accepteConditions = watch('accepteConditions')
-    return paymentMethod && accepteConditions
+    const isValid = paymentMethod && accepteConditions
+    
+    // Debug pour identifier le problème
+    console.log('🔍 Debug validateStep3:', {
+      paymentMethod,
+      accepteConditions,
+      isValid
+    })
+    
+    return isValid
   }
 
   const handleServiceTypeChange = (type: 'transfert' | 'mise-a-disposition') => {
@@ -212,7 +221,12 @@ export default function SecureReservationForm() {
 
       console.log('📤 Envoi des données à l\'API:', reservationData)
 
-      const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
+      // URL API selon l'environnement
+      const apiUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:3000/api/test-reservation' // API locale pour dev
+        : 'https://vtc-transport-conciergerie.fr/api-php/reservation.php'; // API OVH pour prod
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1109,7 +1123,6 @@ export default function SecureReservationForm() {
             <button
               type={paymentMethod === 'sur-place' ? 'submit' : 'button'}
               disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess) || isSubmittingReservation}
-              onClick={paymentMethod === 'immediate' && !paymentSuccess ? undefined : undefined}
               className={`w-full sm:w-auto px-8 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
                 validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess) && !isSubmittingReservation
                   ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transform hover:scale-105'
