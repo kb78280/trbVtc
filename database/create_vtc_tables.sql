@@ -1,10 +1,9 @@
 -- =============================================
--- SCRIPT DE CRÉATION DES TABLES - TRB VTC
--- Base de données MySQL pour les réservations
+-- SCRIPT DE CRÉATION DES TABLES VTC - Compatible WordPress
+-- Base de données MySQL avec préfixe 'vtc_' pour éviter les conflits
 -- =============================================
 
 -- Supprimer les tables VTC si elles existent (dans l'ordre inverse des dépendances)
--- Utilisation du préfixe 'vtc_' pour éviter les conflits avec WordPress
 DROP TABLE IF EXISTS vtc_pricing_info;
 DROP TABLE IF EXISTS vtc_route_info;
 DROP TABLE IF EXISTS vtc_waypoints;
@@ -13,7 +12,7 @@ DROP TABLE IF EXISTS vtc_customer_info;
 DROP TABLE IF EXISTS vtc_reservations;
 
 -- =============================================
--- TABLE PRINCIPALE : RESERVATIONS
+-- TABLE PRINCIPALE : RESERVATIONS VTC
 -- =============================================
 CREATE TABLE vtc_reservations (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -47,9 +46,9 @@ CREATE TABLE vtc_reservations (
 );
 
 -- =============================================
--- TABLE : INFORMATIONS CLIENT
+-- TABLE : INFORMATIONS CLIENT VTC
 -- =============================================
-CREATE TABLE customer_info (
+CREATE TABLE vtc_customer_info (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     first_name VARCHAR(100) NOT NULL,
@@ -58,16 +57,16 @@ CREATE TABLE customer_info (
     email VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservation_id) REFERENCES vtc_reservations(id) ON DELETE CASCADE,
     INDEX idx_reservation_id (reservation_id),
     INDEX idx_email (email),
     INDEX idx_phone (phone)
 );
 
 -- =============================================
--- TABLE : OPTIONS DE RÉSERVATION
+-- TABLE : OPTIONS DE RÉSERVATION VTC
 -- =============================================
-CREATE TABLE reservation_options (
+CREATE TABLE vtc_reservation_options (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     child_seat_quantity INT DEFAULT 0,
@@ -75,14 +74,14 @@ CREATE TABLE reservation_options (
     airport_assistance BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservation_id) REFERENCES vtc_reservations(id) ON DELETE CASCADE,
     INDEX idx_reservation_id (reservation_id)
 );
 
 -- =============================================
--- TABLE : ÉTAPES INTERMÉDIAIRES (WAYPOINTS)
+-- TABLE : ÉTAPES INTERMÉDIAIRES VTC (WAYPOINTS)
 -- =============================================
-CREATE TABLE waypoints (
+CREATE TABLE vtc_waypoints (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     waypoint_order INT NOT NULL,
@@ -92,15 +91,15 @@ CREATE TABLE waypoints (
     longitude DECIMAL(11, 8),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservation_id) REFERENCES vtc_reservations(id) ON DELETE CASCADE,
     INDEX idx_reservation_id (reservation_id),
     INDEX idx_waypoint_order (waypoint_order)
 );
 
 -- =============================================
--- TABLE : INFORMATIONS DE ROUTE
+-- TABLE : INFORMATIONS DE ROUTE VTC
 -- =============================================
-CREATE TABLE route_info (
+CREATE TABLE vtc_route_info (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     distance VARCHAR(50) COMMENT 'Ex: "15,2 km"',
@@ -109,14 +108,14 @@ CREATE TABLE route_info (
     duration_value INT COMMENT 'Durée en secondes',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservation_id) REFERENCES vtc_reservations(id) ON DELETE CASCADE,
     INDEX idx_reservation_id (reservation_id)
 );
 
 -- =============================================
--- TABLE : INFORMATIONS DE PRIX
+-- TABLE : INFORMATIONS DE PRIX VTC
 -- =============================================
-CREATE TABLE pricing_info (
+CREATE TABLE vtc_pricing_info (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     base_price DECIMAL(10, 2) DEFAULT 0.00,
@@ -128,16 +127,14 @@ CREATE TABLE pricing_info (
     duration_minutes INT COMMENT 'Durée pour calcul prix',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservation_id) REFERENCES vtc_reservations(id) ON DELETE CASCADE,
     INDEX idx_reservation_id (reservation_id)
 );
 
 -- =============================================
--- VUES UTILES POUR LES REQUÊTES
+-- VUE COMPLÈTE VTC
 -- =============================================
-
--- Vue complète d'une réservation avec toutes les informations
-CREATE VIEW reservation_complete AS
+CREATE VIEW vtc_reservation_complete AS
 SELECT 
     r.id,
     r.service_type,
@@ -176,18 +173,18 @@ SELECT
     r.created_at,
     r.updated_at
     
-FROM reservations r
-LEFT JOIN customer_info c ON r.id = c.reservation_id
-LEFT JOIN reservation_options o ON r.id = o.reservation_id
-LEFT JOIN route_info rt ON r.id = rt.reservation_id
-LEFT JOIN pricing_info p ON r.id = p.reservation_id;
+FROM vtc_reservations r
+LEFT JOIN vtc_customer_info c ON r.id = c.reservation_id
+LEFT JOIN vtc_reservation_options o ON r.id = o.reservation_id
+LEFT JOIN vtc_route_info rt ON r.id = rt.reservation_id
+LEFT JOIN vtc_pricing_info p ON r.id = p.reservation_id;
 
 -- =============================================
--- DONNÉES DE TEST (OPTIONNEL)
+-- DONNÉES DE TEST VTC (OPTIONNEL)
 -- =============================================
 
 -- Insérer une réservation de test
-INSERT INTO reservations (
+INSERT INTO vtc_reservations (
     service_type, vehicle_type, departure_address, arrival_address,
     reservation_date, reservation_time, passenger_count, baggage_count,
     payment_method, estimated_price
@@ -200,37 +197,37 @@ INSERT INTO reservations (
 SET @reservation_id = LAST_INSERT_ID();
 
 -- Insérer les informations client de test
-INSERT INTO customer_info (reservation_id, first_name, last_name, phone, email)
+INSERT INTO vtc_customer_info (reservation_id, first_name, last_name, phone, email)
 VALUES (@reservation_id, 'Jean', 'Dupont', '0123456789', 'jean.dupont@email.com');
 
 -- Insérer les options de test
-INSERT INTO reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
+INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
 VALUES (@reservation_id, 1, FALSE, TRUE);
 
 -- Insérer les informations de route de test
-INSERT INTO route_info (reservation_id, distance, duration, distance_value, duration_value)
+INSERT INTO vtc_route_info (reservation_id, distance, duration, distance_value, duration_value)
 VALUES (@reservation_id, '45,2 km', '55 minutes', 45200, 3300);
 
 -- Insérer les informations de prix de test
-INSERT INTO pricing_info (reservation_id, base_price, total_ht, tva_amount, total_ttc, distance_km)
+INSERT INTO vtc_pricing_info (reservation_id, base_price, total_ht, tva_amount, total_ttc, distance_km)
 VALUES (@reservation_id, 55.00, 55.00, 10.50, 65.50, 45.2);
 
 -- =============================================
--- REQUÊTES UTILES POUR L'ADMINISTRATION
+-- REQUÊTES UTILES POUR L'ADMINISTRATION VTC
 -- =============================================
 
--- Voir toutes les réservations avec détails
--- SELECT * FROM reservation_complete ORDER BY created_at DESC;
+-- Voir toutes les réservations VTC avec détails
+-- SELECT * FROM vtc_reservation_complete ORDER BY created_at DESC;
 
--- Statistiques par mois
+-- Statistiques VTC par mois
 -- SELECT 
 --     YEAR(reservation_date) as annee,
 --     MONTH(reservation_date) as mois,
 --     COUNT(*) as nombre_reservations,
 --     SUM(estimated_price) as chiffre_affaires
--- FROM reservations 
+-- FROM vtc_reservations 
 -- GROUP BY YEAR(reservation_date), MONTH(reservation_date)
 -- ORDER BY annee DESC, mois DESC;
 
--- Réservations en attente
--- SELECT * FROM reservation_complete WHERE status = 'pending' ORDER BY reservation_date, reservation_time;
+-- Réservations VTC en attente
+-- SELECT * FROM vtc_reservation_complete WHERE status = 'pending' ORDER BY reservation_date, reservation_time;

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import toast, { Toaster } from 'react-hot-toast'
 import DepartureAutocomplete from './DepartureAutocomplete'
 import ArrivalAutocomplete from './ArrivalAutocomplete'
 import InteractiveMap from './InteractiveMap'
@@ -46,6 +47,7 @@ export default function SecureReservationForm() {
   const [paymentAmount, setPaymentAmount] = useState<number>(5000) // 50€ par défaut en centimes
   const [paymentError, setPaymentError] = useState<string>('')
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false)
+  const [isSubmittingReservation, setIsSubmittingReservation] = useState<boolean>(false)
 
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
@@ -179,13 +181,128 @@ export default function SecureReservationForm() {
     console.error('❌ Erreur de paiement:', error)
   }
 
+  // Fonction pour soumettre la réservation à la base de données
+  const submitReservationToDatabase = async (data: ReservationFormData) => {
+    try {
+      // Préparer les données pour l'API
+      const reservationData = {
+        serviceType: data.serviceType,
+        vehicleType: data.vehicleType,
+        depart: departValueRef.current,
+        arrivee: arriveeValueRef.current,
+        originPlace: originPlace,
+        destinationPlace: destinationPlace,
+        duree: data.duree,
+        dateReservation: data.dateReservation,
+        heureReservation: data.heureReservation,
+        prenom: data.prenom,
+        nom: data.nom,
+        telephone: data.telephone,
+        email: data.email,
+        nombrePassagers: passengerCount.toString(),
+        nombreBagages: baggageCount.toString(),
+        siegeEnfantQuantite: data.siegeEnfantQuantite || '0',
+        bouquetFleurs: data.bouquetFleurs || false,
+        assistanceAeroport: data.assistanceAeroport || false,
+        commentaires: data.commentaires || '',
+        methodePaiement: data.methodePaiement,
+        accepteConditions: data.accepteConditions,
+        estimatedPrice: paymentAmount / 100 // Convertir centimes en euros
+      }
+
+      console.log('📤 Envoi des données à l\'API:', reservationData)
+
+      const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reservationData)
+      })
+
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Erreur lors de la réservation')
+      }
+
+      return result
+    } catch (error) {
+      console.error('❌ Erreur lors de la soumission:', error)
+      throw error
+    }
+  }
+
   // Soumission du formulaire
   const onSubmit = async (data: ReservationFormData) => {
     console.log('Données du formulaire:', data)
     
     if (paymentMethod === 'sur-place') {
-      // Paiement plus tard - confirmer directement
-      alert('✅ Réservation confirmée ! Vous paierez sur place.')
+      // Paiement plus tard - confirmer avec appel à la base de données
+      setIsSubmittingReservation(true)
+      
+      // Afficher un toast de chargement
+      const loadingToast = toast.loading('⏳ Confirmation de votre réservation en cours...')
+      
+      try {
+        const result = await submitReservationToDatabase(data)
+        
+        // Succès - fermer le toast de chargement et afficher le succès
+        toast.dismiss(loadingToast)
+        toast.success(
+          '🎉 Réservation confirmée !\n✉️ Vous allez recevoir un email de confirmation.',
+          {
+            duration: 6000,
+            style: {
+              background: '#10B981',
+              color: 'white',
+              padding: '16px',
+              borderRadius: '12px',
+              fontSize: '14px',
+              fontWeight: '500',
+              maxWidth: '400px'
+            },
+            iconTheme: {
+              primary: 'white',
+              secondary: '#10B981'
+            }
+          }
+        )
+        
+        console.log('✅ Réservation créée avec succès:', result)
+        
+        // Optionnel : réinitialiser le formulaire ou rediriger
+        // setTimeout(() => {
+        //   window.location.reload()
+        // }, 3000)
+        
+      } catch (error) {
+        // Erreur - fermer le toast de chargement et afficher l'erreur
+        toast.dismiss(loadingToast)
+        toast.error(
+          '❌ Erreur lors de la confirmation de la réservation.\nVeuillez réessayer ou nous contacter.',
+          {
+            duration: 8000,
+            style: {
+              background: '#EF4444',
+              color: 'white',
+              padding: '16px',
+              borderRadius: '12px',
+              fontSize: '14px',
+              fontWeight: '500',
+              maxWidth: '400px'
+            },
+            iconTheme: {
+              primary: 'white',
+              secondary: '#EF4444'
+            }
+          }
+        )
+        
+        console.error('❌ Erreur lors de la réservation:', error)
+      } finally {
+        setIsSubmittingReservation(false)
+      }
     } else if (paymentMethod === 'immediate') {
       // Paiement immédiat - le paiement sera géré par Stripe
       console.log('💳 Paiement immédiat - géré par Stripe')
@@ -991,18 +1108,27 @@ export default function SecureReservationForm() {
                   </button>
             <button
               type={paymentMethod === 'sur-place' ? 'submit' : 'button'}
-              disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)}
+              disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess) || isSubmittingReservation}
               onClick={paymentMethod === 'immediate' && !paymentSuccess ? undefined : undefined}
               className={`w-full sm:w-auto px-8 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
-                validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess)
+                validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess) && !isSubmittingReservation
                   ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {paymentMethod === 'immediate' 
-                ? (paymentSuccess ? '✅ Réservation confirmée' : '💳 Effectuez le paiement ci-dessus')
-                : '✅ Confirmer la réservation'
-              }
+              {isSubmittingReservation ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Confirmation en cours...
+                </span>
+              ) : (
+                paymentMethod === 'immediate' 
+                  ? (paymentSuccess ? '✅ Réservation confirmée' : '💳 Effectuez le paiement ci-dessus')
+                  : '✅ Confirmer la réservation'
+              )}
             </button>
             </div>
               </div>
@@ -1010,6 +1136,27 @@ export default function SecureReservationForm() {
           </form>
         </div>
       </div>
+      
+      {/* Toaster pour les notifications */}
+      <Toaster 
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        containerStyle={{
+          top: 20,
+          right: 20
+        }}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500'
+          }
+        }}
+      />
     </section>
   )
 }

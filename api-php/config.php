@@ -1,21 +1,25 @@
 <?php
 // Configuration de la base de données MySQL OVH
-define('DB_HOST', 'your-mysql-host.ovh.net');
-define('DB_NAME', 'your_database_name');
-define('DB_USER', 'your_username');
-define('DB_PASSWORD', 'your_password');
+define('DB_HOST', 'vtctrau84.mysql.db:3306');
+define('DB_NAME', 'vtctrau84');
+define('DB_USER', 'vtctrau84');
+define('DB_PASSWORD', 'xZs7R7P8yjmy');
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuration CORS pour votre domaine
 define('ALLOWED_ORIGINS', [
-    'https://your-domain.com',
-    'http://localhost:3000', // Pour le développement
-    'http://127.0.0.1:3000'
+    'https://vtc-transport-conciergerie.fr',    // Votre site WordPress (futur)
+    'https://www.vtc-transport-conciergerie.fr', // Version www
+    'https://trb-vtc.vercel.app',               // Application Vercel de test
+    'https://trb-vtc-git-main.vercel.app',      // Branches Vercel
+    'https://trb-vtc-git-uat.vercel.app',       // Branch UAT Vercel
+    'http://localhost:3000',                    // Développement local
+    'http://127.0.0.1:3000'                    // Développement local
 ]);
 
-// Configuration de sécurité
-define('API_SECRET_KEY', 'your-secret-api-key-here');
-define('MAX_REQUESTS_PER_HOUR', 100);
+// Configuration de sécurité (optionnelle pour usage futur)
+define('API_SECRET_KEY', 'vtc_trb_2024_' . hash('sha256', 'vtctrau84' . date('Y-m')));
+define('MAX_REQUESTS_PER_HOUR', 100); // Limite de requêtes par IP
 
 // Fonction pour établir la connexion PDO
 function getDBConnection() {

@@ -66,7 +66,7 @@ try {
     
     // 1. Insertion de la réservation principale
     $reservationSql = "
-        INSERT INTO reservations (
+        INSERT INTO vtc_reservations (
             service_type, vehicle_type, departure_address, arrival_address,
             departure_place_id, arrival_place_id, departure_lat, departure_lng,
             arrival_lat, arrival_lng, duration_hours, reservation_date, reservation_time,
@@ -100,7 +100,7 @@ try {
     
     // 2. Insertion des informations client
     $customerSql = "
-        INSERT INTO customer_info (reservation_id, first_name, last_name, phone, email)
+        INSERT INTO vtc_customer_info (reservation_id, first_name, last_name, phone, email)
         VALUES (?, ?, ?, ?, ?)
     ";
     $stmt = $pdo->prepare($customerSql);
@@ -114,7 +114,7 @@ try {
     
     // 3. Insertion des options
     $optionsSql = "
-        INSERT INTO reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
+        INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
         VALUES (?, ?, ?, ?)
     ";
     $stmt = $pdo->prepare($optionsSql);
@@ -128,7 +128,7 @@ try {
     // 4. Insertion des informations de route (si disponibles)
     if (isset($data['routeInfo']) && $data['routeInfo']) {
         $routeSql = "
-            INSERT INTO route_info (reservation_id, distance, duration)
+            INSERT INTO vtc_route_info (reservation_id, distance, duration)
             VALUES (?, ?, ?)
         ";
         $stmt = $pdo->prepare($routeSql);
@@ -142,7 +142,7 @@ try {
     // 5. Insertion des informations de prix (si disponibles)
     if (isset($data['priceBreakdown']) && $data['priceBreakdown']) {
         $pricingSql = "
-            INSERT INTO pricing_info (reservation_id, base_price, total_ht, tva_amount, stripe_fees, total_ttc)
+            INSERT INTO vtc_pricing_info (reservation_id, base_price, total_ht, tva_amount, stripe_fees, total_ttc)
             VALUES (?, ?, ?, ?, ?, ?)
         ";
         $stmt = $pdo->prepare($pricingSql);
@@ -159,7 +159,7 @@ try {
     // 6. Insertion des étapes (si disponibles)
     if (isset($data['etapes']) && is_array($data['etapes']) && count($data['etapes']) > 0) {
         $waypointSql = "
-            INSERT INTO waypoints (reservation_id, waypoint_order, address, place_id, latitude, longitude)
+            INSERT INTO vtc_waypoints (reservation_id, waypoint_order, address, place_id, latitude, longitude)
             VALUES (?, ?, ?, ?, ?, ?)
         ";
         $stmt = $pdo->prepare($waypointSql);
