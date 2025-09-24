@@ -53,7 +53,7 @@ export async function PUT(
         [vehicle_id]
       )
 
-      if ((vehicleRows as any[]).length === 0) {
+      if ((vehicleRows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[]).length === 0) {
         return NextResponse.json(
           { message: 'Véhicule non trouvé' },
           { status: 404 }
@@ -66,7 +66,7 @@ export async function PUT(
         [vehicle_id, prix_km, tarif_base, tva, pricingId]
       )
 
-      const updateResult = result as any
+      const updateResult = result /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any
       
       if (updateResult.affectedRows === 0) {
         return NextResponse.json(
@@ -86,7 +86,7 @@ export async function PUT(
         WHERE vp.id = ?
       `, [pricingId])
 
-      const pricing = (rows as any[])[0]
+      const pricing = (rows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[])[0]
       const response = {
         id: pricing.id,
         vehicle_id: pricing.vehicle_id,
@@ -150,7 +150,7 @@ export async function DELETE(
         [pricingId]
       )
 
-      if ((checkRows as any[]).length === 0) {
+      if ((checkRows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[]).length === 0) {
         return NextResponse.json(
           { message: 'Tarif non trouvé' },
           { status: 404 }

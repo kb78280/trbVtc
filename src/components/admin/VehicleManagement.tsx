@@ -44,7 +44,7 @@ export default function VehicleManagement() {
       } else {
         setError('Erreur lors du chargement des véhicules')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     } finally {
       setLoading(false)
@@ -84,7 +84,7 @@ export default function VehicleManagement() {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur lors de la sauvegarde')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     }
   }
@@ -119,7 +119,7 @@ export default function VehicleManagement() {
       } else {
         setError('Erreur lors de la suppression')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     }
   }

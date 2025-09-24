@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         [nom, plaque_immatriculation, capacite_places, capacite_bagages]
       )
 
-      const insertResult = result as any
+      const insertResult = result as { insertId: number }
       
       // Récupérer le véhicule créé
       const [rows] = await connection.execute(
@@ -88,11 +88,12 @@ export async function POST(request: Request) {
         [insertResult.insertId]
       )
 
-      return NextResponse.json((rows as any[])[0], { status: 201 })
+      return NextResponse.json((rows as Array<Record<string, unknown>>)[0], { status: 201 })
 
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
+      const error = dbError as { code?: string }
       
-      if (dbError.code === 'ER_DUP_ENTRY') {
+      if (error.code === 'ER_DUP_ENTRY') {
         return NextResponse.json(
           { message: 'Cette plaque d\'immatriculation existe déjà' },
           { status: 409 }

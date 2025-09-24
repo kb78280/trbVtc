@@ -24,7 +24,11 @@ export async function POST(request: Request) {
         [username]
       )
 
-      const users = rows as any[]
+      const users = rows as Array<{
+        id: number
+        username: string
+        password_hash: string
+      }>
       
       if (users.length === 0) {
         return NextResponse.json(

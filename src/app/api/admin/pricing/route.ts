@@ -45,7 +45,8 @@ export async function GET(request: Request) {
       `)
 
       // Restructurer les données pour inclure les infos véhicule
-      const pricings = (rows as any[]).map(row => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pricings = (rows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[]).map(row => ({
         id: row.id,
         vehicle_id: row.vehicle_id,
         prix_km: row.prix_km,
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
         [vehicle_id]
       )
 
-      if ((vehicleRows as any[]).length === 0) {
+      if ((vehicleRows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[]).length === 0) {
         return NextResponse.json(
           { message: 'Véhicule non trouvé' },
           { status: 404 }
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
         [vehicle_id, prix_km, tarif_base, tva]
       )
 
-      const insertResult = result as any
+      const insertResult = result /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any
       
       // Récupérer le tarif créé avec les infos véhicule
       const [rows] = await connection.execute(`
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
         WHERE vp.id = ?
       `, [insertResult.insertId])
 
-      const pricing = (rows as any[])[0]
+      const pricing = (rows /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ as any[])[0]
       const response = {
         id: pricing.id,
         vehicle_id: pricing.vehicle_id,

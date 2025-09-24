@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur de connexion')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion au serveur')
     } finally {
       setLoading(false)

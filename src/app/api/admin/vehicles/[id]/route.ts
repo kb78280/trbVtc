@@ -52,7 +52,7 @@ export async function PUT(
         [nom, plaque_immatriculation, capacite_places, capacite_bagages, vehicleId]
       )
 
-      const updateResult = result as any
+      const updateResult = result as { affectedRows: number }
       
       if (updateResult.affectedRows === 0) {
         return NextResponse.json(
@@ -67,10 +67,11 @@ export async function PUT(
         [vehicleId]
       )
 
-      return NextResponse.json((rows as any[])[0])
+      return NextResponse.json((rows as Array<Record<string, unknown>>)[0])
 
-    } catch (dbError: any) {
-      if (dbError.code === 'ER_DUP_ENTRY') {
+    } catch (dbError: unknown) {
+      const error = dbError as { code?: string }
+      if (error.code === 'ER_DUP_ENTRY') {
         return NextResponse.json(
           { message: 'Cette plaque d\'immatriculation existe déjà' },
           { status: 409 }
@@ -116,7 +117,7 @@ export async function DELETE(
         [vehicleId]
       )
 
-      if ((checkRows as any[]).length === 0) {
+      if ((checkRows as Array<Record<string, unknown>>).length === 0) {
         return NextResponse.json(
           { message: 'Véhicule non trouvé' },
           { status: 404 }

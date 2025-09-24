@@ -52,7 +52,7 @@ export default function PricingManagement() {
       } else {
         setError('Erreur lors du chargement des prix')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     }
   }
@@ -110,7 +110,7 @@ export default function PricingManagement() {
         const errorData = await response.json()
         setError(errorData.message || 'Erreur lors de la sauvegarde')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     }
   }
@@ -145,7 +145,7 @@ export default function PricingManagement() {
       } else {
         setError('Erreur lors de la suppression')
       }
-    } catch (error) {
+    } catch {
       setError('Erreur de connexion')
     }
   }
