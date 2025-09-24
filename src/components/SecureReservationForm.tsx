@@ -80,13 +80,16 @@ export default function SecureReservationForm() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors }
   } = useForm<ReservationFormData>({
     resolver: zodResolver(reservationSchema),
     defaultValues: {
       serviceType: 'transfert',
       vehicleType: 'berline',
-      methodePaiement: 'immediate'
+      methodePaiement: 'immediate',
+      nombrePassagers: '1',
+      nombreBagages: '0'
     }
   })
 
@@ -140,16 +143,7 @@ export default function SecureReservationForm() {
 
   const validateStep3 = () => {
     const accepteConditions = watch('accepteConditions')
-    const isValid = paymentMethod && accepteConditions
-    
-    // Debug pour identifier le problème
-    console.log('🔍 Debug validateStep3:', {
-      paymentMethod,
-      accepteConditions,
-      isValid
-    })
-    
-    return isValid
+    return paymentMethod && accepteConditions
   }
 
   const handleServiceTypeChange = (type: 'transfert' | 'mise-a-disposition') => {
@@ -169,6 +163,7 @@ export default function SecureReservationForm() {
     setValue('vehicleType', type)
     // Réinitialiser le nombre de passagers à 1 pour les deux types
     setPassengerCount(1)
+    setValue('nombrePassagers', '1') // Synchroniser avec le formulaire
     // Mettre à jour le montant selon le type de véhicule
     const baseAmount = type === 'berline' ? 5000 : 8000 // 50€ ou 80€ en centimes
     setPaymentAmount(baseAmount)
@@ -197,8 +192,8 @@ export default function SecureReservationForm() {
       const reservationData = {
         serviceType: data.serviceType,
         vehicleType: data.vehicleType,
-        depart: departValueRef.current,
-        arrivee: arriveeValueRef.current,
+        depart: departValueRef.current || 'Adresse de départ non définie',
+        arrivee: arriveeValueRef.current || 'Adresse d\'arrivée non définie',
         originPlace: originPlace,
         destinationPlace: destinationPlace,
         duree: data.duree,
@@ -208,8 +203,8 @@ export default function SecureReservationForm() {
         nom: data.nom,
         telephone: data.telephone,
         email: data.email,
-        nombrePassagers: passengerCount.toString(),
-        nombreBagages: baggageCount.toString(),
+        nombrePassagers: data.nombrePassagers || passengerCount.toString(),
+        nombreBagages: data.nombreBagages || baggageCount.toString(),
         siegeEnfantQuantite: data.siegeEnfantQuantite || '0',
         bouquetFleurs: data.bouquetFleurs || false,
         assistanceAeroport: data.assistanceAeroport || false,
@@ -219,14 +214,10 @@ export default function SecureReservationForm() {
         estimatedPrice: paymentAmount / 100 // Convertir centimes en euros
       }
 
-      console.log('📤 Envoi des données à l\'API:', reservationData)
+      console.log('📤 Envoi de la réservation à l\'API...')
 
-      // URL API selon l'environnement
-      const apiUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000/api/test-reservation' // API locale pour dev
-        : 'https://vtc-transport-conciergerie.fr/api-php/reservation.php'; // API OVH pour prod
-        
-      const response = await fetch(apiUrl, {
+      // Toujours utiliser l'API OVH (même en développement)
+      const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,8 +243,8 @@ export default function SecureReservationForm() {
     console.log('Données du formulaire:', data)
     
     if (paymentMethod === 'sur-place') {
-      // Paiement plus tard - confirmer avec appel à la base de données
-      setIsSubmittingReservation(true)
+      // Le bouton est déjà désactivé dans onClick, pas besoin de re-vérifier
+      // setIsSubmittingReservation est déjà à true
       
       // Afficher un toast de chargement
       const loadingToast = toast.loading('⏳ Confirmation de votre réservation en cours...')
@@ -264,9 +255,9 @@ export default function SecureReservationForm() {
         // Succès - fermer le toast de chargement et afficher le succès
         toast.dismiss(loadingToast)
         toast.success(
-          '🎉 Réservation confirmée !\n✉️ Vous allez recevoir un email de confirmation.',
+          '🎉 Réservation confirmée !\n✉️ Vous allez recevoir un email de confirmation.\n🏠 Redirection vers l\'accueil dans 3 secondes...',
           {
-            duration: 6000,
+            duration: 3000,
             style: {
               background: '#10B981',
               color: 'white',
@@ -285,10 +276,33 @@ export default function SecureReservationForm() {
         
         console.log('✅ Réservation créée avec succès:', result)
         
-        // Optionnel : réinitialiser le formulaire ou rediriger
-        // setTimeout(() => {
-        //   window.location.reload()
-        // }, 3000)
+        // Réinitialiser le formulaire après succès
+        setTimeout(() => {
+          // Réinitialiser tous les états
+          setCurrentStep(1)
+          setServiceType('transfert')
+          setVehicleType('berline')
+          setPassengerCount(1)
+          setBaggageCount(0)
+          setPaymentMethod(null)
+          setOriginPlace(null)
+          setDestinationPlace(null)
+          departValueRef.current = ''
+          arriveeValueRef.current = ''
+          setHasDepartureAddress(false)
+          
+          // Réinitialiser le formulaire react-hook-form
+          reset({
+            serviceType: 'transfert',
+            vehicleType: 'berline',
+            methodePaiement: 'immediate',
+            nombrePassagers: '1',
+            nombreBagages: '0'
+          })
+          
+          // Redirection vers l'accueil
+          window.location.href = '/'
+        }, 3000) // Attendre 3 secondes pour que l'utilisateur voie le toast
         
       } catch (error) {
         // Erreur - fermer le toast de chargement et afficher l'erreur
@@ -314,7 +328,8 @@ export default function SecureReservationForm() {
         )
         
         console.error('❌ Erreur lors de la réservation:', error)
-      } finally {
+        
+        // Réactiver le bouton en cas d'erreur
         setIsSubmittingReservation(false)
       }
     } else if (paymentMethod === 'immediate') {
@@ -580,7 +595,9 @@ export default function SecureReservationForm() {
                         type="button"
                         onClick={() => {
                           if (passengerCount > 1) {
-                            setPassengerCount(passengerCount - 1)
+                            const newCount = passengerCount - 1
+                            setPassengerCount(newCount)
+                            setValue('nombrePassagers', newCount.toString())
                           }
                         }}
                         disabled={passengerCount <= 1}
@@ -600,7 +617,9 @@ export default function SecureReservationForm() {
                         onClick={() => {
                           const maxPassengers = vehicleType === 'berline' ? 3 : 8
                           if (passengerCount < maxPassengers) {
-                            setPassengerCount(passengerCount + 1)
+                            const newCount = passengerCount + 1
+                            setPassengerCount(newCount)
+                            setValue('nombrePassagers', newCount.toString())
                           }
                         }}
                         disabled={passengerCount >= (vehicleType === 'berline' ? 3 : 8)}
@@ -625,7 +644,9 @@ export default function SecureReservationForm() {
                         type="button"
                         onClick={() => {
                           if (baggageCount > 0) {
-                            setBaggageCount(baggageCount - 1)
+                            const newCount = baggageCount - 1
+                            setBaggageCount(newCount)
+                            setValue('nombreBagages', newCount.toString())
                           }
                         }}
                         disabled={baggageCount <= 0}
@@ -644,7 +665,9 @@ export default function SecureReservationForm() {
                         type="button"
                         onClick={() => {
                           if (baggageCount < 10) {
-                            setBaggageCount(baggageCount + 1)
+                            const newCount = baggageCount + 1
+                            setBaggageCount(newCount)
+                            setValue('nombreBagages', newCount.toString())
                           }
                         }}
                         disabled={baggageCount >= 10}
@@ -1121,7 +1144,14 @@ export default function SecureReservationForm() {
                     ← Retour
                   </button>
             <button
-              type={paymentMethod === 'sur-place' ? 'submit' : 'button'}
+              type="button"
+              onClick={() => {
+                if (paymentMethod === 'sur-place' && !isSubmittingReservation) {
+                  // Désactiver immédiatement le bouton
+                  setIsSubmittingReservation(true);
+                  handleSubmit(onSubmit)();
+                }
+              }}
               disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess) || isSubmittingReservation}
               className={`w-full sm:w-auto px-8 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
                 validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess) && !isSubmittingReservation
@@ -1131,11 +1161,11 @@ export default function SecureReservationForm() {
             >
               {isSubmittingReservation ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Confirmation en cours...
+                  ⏳ Confirmation en cours...
                 </span>
               ) : (
                 paymentMethod === 'immediate' 

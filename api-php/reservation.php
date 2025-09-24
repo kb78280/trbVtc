@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'email-service.php';
 
 // Configuration des headers CORS
 header('Content-Type: application/json');
@@ -43,8 +44,15 @@ try {
     ];
     
     foreach ($requiredFields as $field) {
-        if (!isset($data[$field]) || empty($data[$field])) {
-            throw new Exception("Champ obligatoire manquant: $field");
+        // Cas spéciaux pour les champs qui peuvent être "0"
+        if (in_array($field, ['nombrePassagers', 'nombreBagages'])) {
+            if (!isset($data[$field]) || $data[$field] === '' || $data[$field] === null) {
+                throw new Exception("Champ obligatoire manquant: $field");
+            }
+        } else {
+            if (!isset($data[$field]) || empty($data[$field])) {
+                throw new Exception("Champ obligatoire manquant: $field");
+            }
         }
     }
     
@@ -185,11 +193,34 @@ try {
     // Log de succès
     logError("Réservation créée avec succès", ['reservation_id' => $reservationId]);
     
+    // 7. Envoi des emails de confirmation
+    $emailService = new EmailService();
+    
+    // Préparer les données pour l'email
+    $emailData = array_merge($data, ['reservation_id' => $reservationId]);
+    
+    // Envoyer l'email de confirmation au client
+    $clientEmailSent = $emailService->sendReservationConfirmation($emailData);
+    
+    // Envoyer la notification à l'admin
+    $adminEmailSent = $emailService->sendAdminNotification($emailData);
+    
+    // Log des envois d'emails
+    logError("Emails envoyés", [
+        'reservation_id' => $reservationId,
+        'client_email_sent' => $clientEmailSent,
+        'admin_email_sent' => $adminEmailSent
+    ]);
+    
     // Réponse de succès
     jsonResponse([
         'success' => true,
         'message' => 'Réservation enregistrée avec succès',
         'reservation_id' => $reservationId,
+        'emails_sent' => [
+            'client' => $clientEmailSent,
+            'admin' => $adminEmailSent
+        ],
         'data' => [
             'service_type' => $data['serviceType'],
             'vehicle_type' => $data['vehicleType'],
