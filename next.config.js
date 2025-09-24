@@ -1,19 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuration pour Vercel (routes API supportées)
-  // output: 'export', // Désactivé pour supporter les routes API admin
+  // Configuration pour l'export statique (compatible OVH)
+  output: 'export',
   trailingSlash: true,
   images: {
     unoptimized: true
   },
   
-  // Ignorer les erreurs ESLint et TypeScript pendant le build
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  }
+  // Note: Les en-têtes de sécurité seront configurés via .htaccess sur OVH
+  // car ils ne sont pas compatibles avec output: 'export'
 }
 
 module.exports = nextConfig
