@@ -1,0 +1,19 @@
+## Error Type
+Runtime TypeError
+
+## Error Message
+reservations.reduce(...).toFixed is not a function
+
+
+    at AdminPage (src/app/admintrb/page.tsx:181:83)
+
+## Code Frame
+  179 |           <div className="bg-white p-6 rounded-lg shadow">
+  180 |             <div className="text-2xl font-bold text-purple-600">
+> 181 |               {reservations.reduce((sum, r) => sum + (r.estimated_price || 0), 0).toFixed(2)}€
+      |                                                                                   ^
+  182 |             </div>
+  183 |             <div className="text-sm text-gray-600">Chiffre d'affaires estimé</div>
+  184 |           </div>
+
+Next.js version: 15.5.2 (Webpack)

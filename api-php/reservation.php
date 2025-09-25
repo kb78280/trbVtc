@@ -61,10 +61,8 @@ try {
         throw new Exception('Vous devez accepter les conditions générales');
     }
     
-    // Validation des places Google Maps
-    if (!isset($data['originPlace']) || !isset($data['destinationPlace'])) {
-        throw new Exception('Adresses Google Maps manquantes');
-    }
+    // Validation des places Google Maps (optionnelles si adresses texte présentes)
+    // Note: originPlace et destinationPlace peuvent être null si l'utilisateur tape manuellement
     
     // Connexion à la base de données
     $pdo = getDBConnection();
@@ -76,11 +74,22 @@ try {
     $reservationSql = "
         INSERT INTO vtc_reservations (
             service_type, vehicle_type, departure_address, arrival_address,
-            departure_place_id, arrival_place_id, departure_lat, departure_lng,
-            arrival_lat, arrival_lng, duration_hours, reservation_date, reservation_time,
-            passenger_count, baggage_count, payment_method, comments, estimated_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            duration_hours, reservation_date, reservation_time,
+            passenger_count, baggage_count, payment_method, comments, estimated_price, distance_km
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
+    
+    // Calculer la distance en km si disponible
+    $distanceKm = null;
+    if (isset($data['distance']) && is_string($data['distance'])) {
+        // Extraire les km de la chaîne "X,Y km" 
+        preg_match('/([0-9,\.]+)\s*km/i', $data['distance'], $matches);
+        if (!empty($matches[1])) {
+            $distanceKm = (float)str_replace(',', '.', $matches[1]);
+        }
+    } elseif (isset($data['distanceKm']) && is_numeric($data['distanceKm'])) {
+        $distanceKm = (float)$data['distanceKm'];
+    }
     
     $stmt = $pdo->prepare($reservationSql);
     $stmt->execute([
@@ -88,12 +97,6 @@ try {
         $data['vehicleType'],
         $data['depart'],
         $data['arrivee'],
-        $data['originPlace']['place_id'] ?? null,
-        $data['destinationPlace']['place_id'] ?? null,
-        $data['originPlace']['geometry']['location']['lat'] ?? null,
-        $data['originPlace']['geometry']['location']['lng'] ?? null,
-        $data['destinationPlace']['geometry']['location']['lat'] ?? null,
-        $data['destinationPlace']['geometry']['location']['lng'] ?? null,
         ($data['serviceType'] === 'mise-a-disposition') ? (int)$data['duree'] : null,
         $data['dateReservation'],
         $data['heureReservation'],
@@ -101,12 +104,13 @@ try {
         (int)$data['nombreBagages'],
         $data['methodePaiement'],
         $data['commentaires'] ?? null,
-        $data['estimatedPrice'] ?? 0
+        $data['estimatedPrice'] ?? 0,
+        $distanceKm
     ]);
     
     $reservationId = $pdo->lastInsertId();
     
-    // 2. Insertion des informations client
+    // 2. Insertion des informations client (sans nombre_reservations d'abord)
     $customerSql = "
         INSERT INTO vtc_customer_info (reservation_id, first_name, last_name, phone, email)
         VALUES (?, ?, ?, ?, ?)
@@ -119,6 +123,17 @@ try {
         $data['telephone'],
         $data['email']
     ]);
+    
+    // Maintenant calculer et mettre à jour nombre_reservations pour cet email
+    $countSql = "SELECT COUNT(*) as count FROM vtc_customer_info WHERE email = ?";
+    $countStmt = $pdo->prepare($countSql);
+    $countStmt->execute([$data['email']]);
+    $nombreReservations = $countStmt->fetch()['count'];
+    
+    // Mettre à jour toutes les entrées avec le même email
+    $updateCountSql = "UPDATE vtc_customer_info SET nombre_reservations = ? WHERE email = ?";
+    $updateStmt = $pdo->prepare($updateCountSql);
+    $updateStmt->execute([$nombreReservations, $data['email']]);
     
     // 3. Insertion des options
     $optionsSql = "
@@ -133,19 +148,8 @@ try {
         (bool)($data['assistanceAeroport'] ?? false)
     ]);
     
-    // 4. Insertion des informations de route (si disponibles)
-    if (isset($data['routeInfo']) && $data['routeInfo']) {
-        $routeSql = "
-            INSERT INTO vtc_route_info (reservation_id, distance, duration)
-            VALUES (?, ?, ?)
-        ";
-        $stmt = $pdo->prepare($routeSql);
-        $stmt->execute([
-            $reservationId,
-            $data['routeInfo']['distance'],
-            $data['routeInfo']['duration']
-        ]);
-    }
+    // 4. Note: Les informations de route sont maintenant stockées dans vtc_reservations.distance_km
+    // Plus besoin d'insérer dans vtc_route_info (table supprimée)
     
     // 5. Insertion des informations de prix (si disponibles)
     if (isset($data['priceBreakdown']) && $data['priceBreakdown']) {
@@ -164,24 +168,20 @@ try {
         ]);
     }
     
-    // 6. Insertion des étapes (si disponibles)
+    // 6. Insertion des étapes (structure simplifiée - seulement l'adresse)
     if (isset($data['etapes']) && is_array($data['etapes']) && count($data['etapes']) > 0) {
         $waypointSql = "
-            INSERT INTO vtc_waypoints (reservation_id, waypoint_order, address, place_id, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO vtc_waypoints (reservation_id, waypoint_order, address)
+            VALUES (?, ?, ?)
         ";
         $stmt = $pdo->prepare($waypointSql);
         
         foreach ($data['etapes'] as $index => $etape) {
             if (!empty($etape)) {
-                $etapePlace = $data['etapesPlaces'][$index] ?? null;
                 $stmt->execute([
                     $reservationId,
                     $index + 1,
-                    $etape,
-                    $etapePlace['place_id'] ?? null,
-                    $etapePlace['geometry']['location']['lat'] ?? null,
-                    $etapePlace['geometry']['location']['lng'] ?? null
+                    $etape
                 ]);
             }
         }
@@ -190,10 +190,11 @@ try {
     // Validation de la transaction
     $pdo->commit();
     
-    // Log de succès
-    logError("Réservation créée avec succès", ['reservation_id' => $reservationId]);
+    // Log de succès (désactivé temporairement pour debug)
+    // logError("Réservation créée avec succès", ['reservation_id' => $reservationId]);
     
-    // 7. Envoi des emails de confirmation
+    // 7. Envoi des emails de confirmation (désactivé temporairement pour debug)
+    /*
     $emailService = new EmailService();
     
     // Préparer les données pour l'email
@@ -211,16 +212,13 @@ try {
         'client_email_sent' => $clientEmailSent,
         'admin_email_sent' => $adminEmailSent
     ]);
+    */
     
     // Réponse de succès
     jsonResponse([
         'success' => true,
         'message' => 'Réservation enregistrée avec succès',
         'reservation_id' => $reservationId,
-        'emails_sent' => [
-            'client' => $clientEmailSent,
-            'admin' => $adminEmailSent
-        ],
         'data' => [
             'service_type' => $data['serviceType'],
             'vehicle_type' => $data['vehicleType'],

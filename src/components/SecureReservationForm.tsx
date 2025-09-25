@@ -52,6 +52,7 @@ export default function SecureReservationForm() {
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
   const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
+  const [routeInfo, setRouteInfo] = useState<{distance: string, duration: string} | null>(null)
 
   // Initialisation côté client pour éviter l'hydratation mismatch
   useEffect(() => {
@@ -211,10 +212,15 @@ export default function SecureReservationForm() {
         commentaires: data.commentaires || '',
         methodePaiement: data.methodePaiement,
         accepteConditions: data.accepteConditions,
-        estimatedPrice: paymentAmount / 100 // Convertir centimes en euros
+        estimatedPrice: paymentAmount / 100, // Convertir centimes en euros
+        distance: routeInfo?.distance, // Pour calculer distance_km
+        routeInfo: routeInfo // Informations de route complètes
       }
 
       console.log('📤 Envoi de la réservation à l\'API...')
+      console.log('🔍 originPlace:', originPlace)
+      console.log('🔍 destinationPlace:', destinationPlace)
+      console.log('🔍 routeInfo:', routeInfo)
 
       // Toujours utiliser l'API OVH (même en développement)
       const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
@@ -415,6 +421,7 @@ export default function SecureReservationForm() {
                       className="w-full h-full"
                       onRouteCalculated={(distance: string, duration: string) => {
                         console.log('Route calculée:', { distance, duration })
+                        setRouteInfo({ distance, duration })
                       }}
                     />
             </div>
@@ -429,6 +436,7 @@ export default function SecureReservationForm() {
                     value=""
                     onChange={(value, placeDetails) => {
                       departValueRef.current = value
+                      setValue('depart', value) // Synchroniser avec react-hook-form
                       
                       // Mettre à jour l'état pour contrôler l'interface
                       setHasDepartureAddress(value.trim().length > 0)
@@ -441,6 +449,7 @@ export default function SecureReservationForm() {
                       // Si on vide le départ, vider aussi l'arrivée
                       if (!value.trim()) {
                         arriveeValueRef.current = ''
+                        setValue('arrivee', '') // Synchroniser avec react-hook-form
                         setDestinationPlace(null)
                         setArriveeKey(prev => prev + 1) // Forcer le re-render de l'arrivée
                       }
@@ -464,6 +473,7 @@ export default function SecureReservationForm() {
                         }
                         
                       arriveeValueRef.current = value
+                      setValue('arrivee', value) // Synchroniser avec react-hook-form
                         if (placeDetails) {
                         setDestinationPlace(placeDetails)
                           console.log('🎯 Destination mise à jour:', placeDetails.formatted_address)
@@ -996,7 +1006,10 @@ export default function SecureReservationForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('immediate')}
+                    onClick={() => {
+                      setPaymentMethod('immediate')
+                      setValue('methodePaiement', 'immediate')
+                    }}
                     className={`group relative p-8 rounded-2xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
                       paymentMethod === 'immediate'
                         ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg'
@@ -1032,7 +1045,10 @@ export default function SecureReservationForm() {
 
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('sur-place')}
+                    onClick={() => {
+                      setPaymentMethod('sur-place')
+                      setValue('methodePaiement', 'sur-place')
+                    }}
                     className={`group relative p-8 rounded-2xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
                       paymentMethod === 'sur-place'
                         ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 text-green-900 shadow-lg'
@@ -1163,7 +1179,7 @@ export default function SecureReservationForm() {
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 0 14 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   ⏳ Confirmation en cours...
                 </span>

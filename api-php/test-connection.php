@@ -21,7 +21,7 @@ try {
         'vtc_customer_info', 
         'vtc_reservation_options',
         'vtc_waypoints',
-        'vtc_route_info',
+        // 'vtc_route_info', // Table supprimée
         'vtc_pricing_info'
     ];
     

@@ -41,19 +41,13 @@ export async function executeQuery<T = unknown>(
   }
 }
 
-// Fonction pour insérer une réservation complète (transaction)
+// Fonction pour insérer une réservation complète (transaction) - Structure mise à jour
 export async function insertReservation(data: {
-  // Réservation principale
+  // Réservation principale (structure simplifiée)
   service_type: string
   vehicle_type: string
   departure_address: string
   arrival_address: string
-  departure_place_id?: string | null
-  arrival_place_id?: string | null
-  departure_lat?: number | null
-  departure_lng?: number | null
-  arrival_lat?: number | null
-  arrival_lng?: number | null
   duration_hours?: number | null
   reservation_date: string
   reservation_time: string
@@ -62,6 +56,7 @@ export async function insertReservation(data: {
   payment_method: string
   comments?: string | null
   estimated_price: number
+  distance_km?: number | null
   
   // Informations client
   first_name: string
@@ -74,28 +69,17 @@ export async function insertReservation(data: {
   flower_bouquet?: boolean
   airport_assistance?: boolean
   
-  // Route (optionnel)
-  route_distance?: string | null
-  route_duration?: string | null
-  route_distance_value?: number | null
-  route_duration_value?: number | null
-  
   // Prix (optionnel)
   base_price?: number | null
   total_ht?: number | null
   tva_amount?: number | null
   stripe_fees?: number | null
   total_ttc?: number | null
-  distance_km?: number | null
-  duration_minutes?: number | null
   
-  // Étapes (optionnel)
+  // Étapes (simplifiées)
   waypoints?: Array<{
     waypoint_order: number
     address: string
-    place_id?: string | null
-    latitude?: number | null
-    longitude?: number | null
   }>
 }) {
   const pool = getPool()
@@ -105,19 +89,17 @@ export async function insertReservation(data: {
     await connection.beginTransaction()
     console.log('🔄 [DATABASE] Début de la transaction')
     
-    // 1. Insérer la réservation principale
+    // 1. Insérer la réservation principale (structure mise à jour)
     const [reservationResult] = await connection.execute(`
-      INSERT INTO reservations (
+      INSERT INTO vtc_reservations (
         service_type, vehicle_type, departure_address, arrival_address,
-        departure_place_id, arrival_place_id, departure_lat, departure_lng,
-        arrival_lat, arrival_lng, duration_hours, reservation_date, reservation_time,
-        passenger_count, baggage_count, payment_method, comments, estimated_price
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        duration_hours, reservation_date, reservation_time,
+        passenger_count, baggage_count, payment_method, comments, estimated_price, distance_km
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       data.service_type, data.vehicle_type, data.departure_address, data.arrival_address,
-      data.departure_place_id, data.arrival_place_id, data.departure_lat, data.departure_lng,
-      data.arrival_lat, data.arrival_lng, data.duration_hours, data.reservation_date, data.reservation_time,
-      data.passenger_count, data.baggage_count, data.payment_method, data.comments, data.estimated_price
+      data.duration_hours, data.reservation_date, data.reservation_time,
+      data.passenger_count, data.baggage_count, data.payment_method, data.comments, data.estimated_price, data.distance_km
     ])
     
     const reservationId = (reservationResult as { insertId: number }).insertId
@@ -125,14 +107,14 @@ export async function insertReservation(data: {
     
     // 2. Insérer les informations client
     await connection.execute(`
-      INSERT INTO customer_info (reservation_id, first_name, last_name, phone, email)
+      INSERT INTO vtc_customer_info (reservation_id, first_name, last_name, phone, email)
       VALUES (?, ?, ?, ?, ?)
     `, [reservationId, data.first_name, data.last_name, data.phone, data.email])
     console.log('✅ [DATABASE] Informations client insérées')
     
     // 3. Insérer les options
     await connection.execute(`
-      INSERT INTO reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
+      INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
       VALUES (?, ?, ?, ?)
     `, [
       reservationId, 
@@ -142,52 +124,35 @@ export async function insertReservation(data: {
     ])
     console.log('✅ [DATABASE] Options insérées')
     
-    // 4. Insérer les informations de route (si disponibles)
-    if (data.route_distance && data.route_duration) {
-      await connection.execute(`
-        INSERT INTO route_info (reservation_id, distance, duration, distance_value, duration_value)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        reservationId, 
-        data.route_distance, 
-        data.route_duration, 
-        data.route_distance_value || null, 
-        data.route_duration_value || null
-      ])
-      console.log('✅ [DATABASE] Informations de route insérées')
-    }
+    // 4. Note: Les informations de route sont maintenant dans vtc_reservations.distance_km
+    // Plus besoin d'insérer dans vtc_route_info (table supprimée)
     
-    // 5. Insérer les informations de prix (si disponibles)
+    // 5. Insérer les informations de prix (structure simplifiée)
     if (data.total_ttc) {
       await connection.execute(`
-        INSERT INTO pricing_info (reservation_id, base_price, total_ht, tva_amount, stripe_fees, total_ttc, distance_km, duration_minutes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO vtc_pricing_info (reservation_id, base_price, total_ht, tva_amount, stripe_fees, total_ttc)
+        VALUES (?, ?, ?, ?, ?, ?)
       `, [
         reservationId,
         data.base_price || 0,
         data.total_ht || 0,
         data.tva_amount || 0,
         data.stripe_fees || 0,
-        data.total_ttc,
-        data.distance_km || null,
-        data.duration_minutes || null
+        data.total_ttc
       ])
       console.log('✅ [DATABASE] Informations de prix insérées')
     }
     
-    // 6. Insérer les étapes (si disponibles)
+    // 6. Insérer les étapes (structure simplifiée)
     if (data.waypoints && data.waypoints.length > 0) {
       for (const waypoint of data.waypoints) {
         await connection.execute(`
-          INSERT INTO waypoints (reservation_id, waypoint_order, address, place_id, latitude, longitude)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO vtc_waypoints (reservation_id, waypoint_order, address)
+          VALUES (?, ?, ?)
         `, [
           reservationId,
           waypoint.waypoint_order,
-          waypoint.address,
-          waypoint.place_id || null,
-          waypoint.latitude || null,
-          waypoint.longitude || null
+          waypoint.address
         ])
       }
       console.log('✅ [DATABASE] Étapes insérées:', data.waypoints.length)
@@ -211,7 +176,7 @@ export async function insertReservation(data: {
 export async function getReservationComplete(reservationId: number) {
   try {
     const [rows] = await executeQuery(
-      'SELECT * FROM reservation_complete WHERE id = ?',
+      'SELECT * FROM vtc_reservations WHERE id = ?',
       [reservationId]
     )
     return (rows as unknown[])[0] || null
