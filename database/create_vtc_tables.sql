@@ -70,6 +70,7 @@ CREATE TABLE vtc_reservation_options (
     id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
     child_seat_quantity INT DEFAULT 0,
+    rehausseur_quantite INT DEFAULT 0,
     flower_bouquet BOOLEAN DEFAULT FALSE,
     airport_assistance BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -157,6 +158,7 @@ SELECT
     
     -- Options
     o.child_seat_quantity,
+    o.rehausseur_quantite,
     o.flower_bouquet,
     o.airport_assistance,
     
@@ -201,8 +203,8 @@ INSERT INTO vtc_customer_info (reservation_id, first_name, last_name, phone, ema
 VALUES (@reservation_id, 'Jean', 'Dupont', '0123456789', 'jean.dupont@email.com');
 
 -- Insérer les options de test
-INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
-VALUES (@reservation_id, 1, FALSE, TRUE);
+INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, rehausseur_quantite, flower_bouquet, airport_assistance)
+VALUES (@reservation_id, 1, 0, FALSE, TRUE);
 
 -- Insérer les informations de route de test
 INSERT INTO vtc_route_info (reservation_id, distance, duration, distance_value, duration_value)

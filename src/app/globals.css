@@ -40,3 +40,71 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Styles pour améliorer le contraste des inputs et selects sur tous les navigateurs */
+input, textarea, select {
+  color: #1f2937 !important; /* Gris très foncé pour le texte saisi */
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important; /* Gris moyen pour les placeholders */
+  opacity: 1 !important; /* Force l'opacité à 100% sur tous les navigateurs */
+}
+
+/* Styles spécifiques pour les selects */
+select {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+}
+
+select option {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+}
+
+/* Amélioration pour les inputs disabled */
+input:disabled, textarea:disabled, select:disabled {
+  color: #9ca3af !important;
+  background-color: #f9fafb !important;
+}
+
+input:disabled::placeholder, textarea:disabled::placeholder {
+  color: #d1d5db !important;
+}
+
+/* Styles pour les autocomplete de Google Maps */
+.pac-container {
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+.pac-item {
+  color: #1f2937 !important;
+}
+
+.pac-item-query {
+  color: #1f2937 !important;
+}
+
+/* Corrections spécifiques pour WebKit (Safari, Chrome mobile) */
+input, textarea, select {
+  -webkit-text-fill-color: #1f2937 !important;
+  -webkit-opacity: 1 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  -webkit-text-fill-color: #6b7280 !important;
+}
+
+/* Correction pour les inputs en mode sombre automatique */
+@media (prefers-color-scheme: dark) {
+  input, textarea, select {
+    color: #1f2937 !important;
+    -webkit-text-fill-color: #1f2937 !important;
+    background-color: #ffffff !important;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: #6b7280 !important;
+    -webkit-text-fill-color: #6b7280 !important;
+  }
+}

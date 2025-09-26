@@ -89,33 +89,78 @@ function handleGetVehicles($pdo, $vehicleId = null) {
             'message' => 'Véhicule récupéré avec succès'
         ]);
     } else {
-        // Récupérer tous les véhicules
-        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
-        $offset = ($page - 1) * $limit;
+        // Vérifier si c'est une requête pour le formulaire de réservation (frontend)
+        $isReservationRequest = isset($_GET['for_reservation']) && $_GET['for_reservation'] === 'true';
         
-        $sql = "SELECT * FROM vtc_voitures ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$limit, $offset]);
-        $vehicles = $stmt->fetchAll();
-        
-        // Compter le total
-        $countSql = "SELECT COUNT(*) as total FROM vtc_voitures";
-        $countStmt = $pdo->prepare($countSql);
-        $countStmt->execute();
-        $totalCount = $countStmt->fetch()['total'];
-        
-        jsonResponse([
-            'success' => true,
-            'data' => $vehicles,
-            'pagination' => [
-                'current_page' => $page,
-                'per_page' => $limit,
-                'total' => (int)$totalCount,
-                'total_pages' => ceil($totalCount / $limit)
-            ],
-            'message' => 'Véhicules récupérés avec succès'
-        ]);
+        if ($isReservationRequest) {
+            // Format spécial pour le formulaire de réservation
+            $sql = "SELECT * FROM vtc_voitures ORDER BY type, nom";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute();
+            $vehicles = $stmt->fetchAll();
+            
+            // Organiser les véhicules par type pour faciliter l'utilisation côté frontend
+            $organizedVehicles = [
+                'confort' => [],
+                'van' => []
+            ];
+            
+            $allVehicles = [];
+            
+            foreach ($vehicles as $vehicle) {
+                // Ajouter des informations calculées utiles pour la réservation
+                $vehicle['display_name'] = $vehicle['nom'];
+                $vehicle['capacity_info'] = $vehicle['nombre_places'] . ' places, ' . $vehicle['nombre_bagages'] . ' bagages';
+                $vehicle['price_info'] = [
+                    'base_hourly' => floatval($vehicle['prix_base_mad']),
+                    'rate_per_km' => floatval($vehicle['taux_km'])
+                ];
+                
+                // Ajouter au tableau organisé par type
+                $organizedVehicles[$vehicle['type']][] = $vehicle;
+                
+                // Ajouter au tableau global
+                $allVehicles[] = $vehicle;
+            }
+            
+            jsonResponse([
+                'success' => true,
+                'data' => [
+                    'vehicles' => $allVehicles,
+                    'by_type' => $organizedVehicles,
+                    'count' => count($allVehicles)
+                ],
+                'message' => 'Véhicules récupérés avec succès'
+            ]);
+        } else {
+            // Format standard pour l'administration (avec pagination)
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+            $offset = ($page - 1) * $limit;
+            
+            $sql = "SELECT * FROM vtc_voitures ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$limit, $offset]);
+            $vehicles = $stmt->fetchAll();
+            
+            // Compter le total
+            $countSql = "SELECT COUNT(*) as total FROM vtc_voitures";
+            $countStmt = $pdo->prepare($countSql);
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch()['total'];
+            
+            jsonResponse([
+                'success' => true,
+                'data' => $vehicles,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $limit,
+                    'total' => (int)$totalCount,
+                    'total_pages' => ceil($totalCount / $limit)
+                ],
+                'message' => 'Véhicules récupérés avec succès'
+            ]);
+        }
     }
 }
 

@@ -137,13 +137,14 @@ try {
     
     // 3. Insertion des options
     $optionsSql = "
-        INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, flower_bouquet, airport_assistance)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO vtc_reservation_options (reservation_id, child_seat_quantity, rehausseur_quantite, flower_bouquet, airport_assistance)
+        VALUES (?, ?, ?, ?, ?)
     ";
     $stmt = $pdo->prepare($optionsSql);
     $stmt->execute([
         $reservationId,
         (int)($data['siegeEnfantQuantite'] ?? 0),
+        (int)($data['rehausseurQuantite'] ?? 0),
         (bool)($data['bouquetFleurs'] ?? false),
         (bool)($data['assistanceAeroport'] ?? false)
     ]);

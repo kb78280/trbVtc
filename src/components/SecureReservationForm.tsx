@@ -9,10 +9,14 @@ import DepartureAutocomplete from './DepartureAutocomplete'
 import ArrivalAutocomplete from './ArrivalAutocomplete'
 import InteractiveMap from './InteractiveMap'
 import StripePaymentForm from './StripePaymentForm'
+import VehicleSelector from './VehicleSelector'
+import { useVehicles } from '@/hooks/useVehicles'
+import { Vehicle } from '@/types/vehicles'
 
 const reservationSchema = z.object({
   serviceType: z.enum(['transfert', 'mise-a-disposition']),
   vehicleType: z.enum(['berline', 'van']),
+  vehicleId: z.number().optional(),
   depart: z.string().optional(),
   arrivee: z.string().optional(),
   duree: z.string().optional(),
@@ -25,6 +29,7 @@ const reservationSchema = z.object({
   nombrePassagers: z.string().min(1, 'Le nombre de passagers est requis'),
   nombreBagages: z.string().min(1, 'Le nombre de bagages est requis'),
   siegeEnfantQuantite: z.string().optional(),
+  rehausseurQuantite: z.string().optional(),
   bouquetFleurs: z.boolean().optional(),
   assistanceAeroport: z.boolean().optional(),
   commentaires: z.string().optional(),
@@ -39,6 +44,8 @@ export default function SecureReservationForm() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [serviceType, setServiceType] = useState<'transfert' | 'mise-a-disposition'>('transfert')
   const [vehicleType, setVehicleType] = useState<'berline' | 'van'>('berline')
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null)
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [passengerCount, setPassengerCount] = useState<number>(1)
   const [baggageCount, setBaggageCount] = useState<number>(0)
   const [minDate, setMinDate] = useState<string>('')
@@ -48,6 +55,9 @@ export default function SecureReservationForm() {
   const [paymentError, setPaymentError] = useState<string>('')
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false)
   const [isSubmittingReservation, setIsSubmittingReservation] = useState<boolean>(false)
+
+  // Hook pour récupérer les véhicules
+  const { vehicles, vehiclesByType, loading: vehiclesLoading, error: vehiclesError } = useVehicles()
 
   // États pour Google Maps
   const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
@@ -90,9 +100,26 @@ export default function SecureReservationForm() {
       vehicleType: 'berline',
       methodePaiement: 'immediate',
       nombrePassagers: '1',
-      nombreBagages: '0'
+      nombreBagages: '0',
+      siegeEnfantQuantite: '0',
+      rehausseurQuantite: '0'
     }
   })
+
+  // Auto-sélectionner le premier véhicule au chargement
+  useEffect(() => {
+    if (vehicles.length > 0 && selectedVehicleId === null) {
+      const firstVehicle = vehicles[0]
+      setSelectedVehicleId(firstVehicle.id)
+      setSelectedVehicle(firstVehicle)
+      setValue('vehicleId', firstVehicle.id)
+      
+      // Mettre à jour le type de véhicule selon le véhicule auto-sélectionné
+      const newVehicleType = firstVehicle.type === 'confort' ? 'berline' : 'van'
+      setVehicleType(newVehicleType)
+      setValue('vehicleType', newVehicleType)
+    }
+  }, [vehicles, selectedVehicleId, setValue])
 
   const scrollToFormSection = () => {
     const formElement = document.getElementById('reservation-form')
@@ -125,12 +152,28 @@ export default function SecureReservationForm() {
   }, [])
 
   const validateStep1 = () => {
-    const hasValidAddresses = originPlace && destinationPlace
+    // Validation des adresses selon le type de service
+    const hasValidAddresses = serviceType === 'transfert' 
+      ? (originPlace && destinationPlace)  // Transfert: départ + arrivée obligatoires
+      : originPlace                        // Mise à dispo: départ obligatoire seulement
+    
     const hasDateTime = watch('dateReservation') && watch('heureReservation')
     const hasServiceType = serviceType
-    const hasVehicleType = vehicleType
+    const hasSelectedVehicle = selectedVehicleId !== null
     
-    return hasValidAddresses && hasDateTime && hasServiceType && hasVehicleType
+    // Debug temporaire pour identifier le problème
+    console.log('🔍 Validation Step1:', {
+      serviceType,
+      hasValidAddresses,
+      originPlace: !!originPlace,
+      destinationPlace: !!destinationPlace,
+      hasDateTime,
+      hasServiceType,
+      hasSelectedVehicle,
+      selectedVehicleId
+    })
+    
+    return hasValidAddresses && hasDateTime && hasServiceType && hasSelectedVehicle
   }
 
   const validateStep2 = () => {
@@ -151,23 +194,62 @@ export default function SecureReservationForm() {
     setServiceType(type)
     setValue('serviceType', type)
     
-    if (type === 'transfert') {
-      setValue('arrivee', '')
-      arriveeValueRef.current = ''
-      setDestinationPlace(null)
+    // Auto-sélectionner le premier véhicule disponible
+    if (vehicles.length > 0) {
+      const firstVehicle = vehicles[0]
+      setSelectedVehicleId(firstVehicle.id)
+      setSelectedVehicle(firstVehicle)
+      setValue('vehicleId', firstVehicle.id)
+      
+      // Mettre à jour le type de véhicule selon le véhicule auto-sélectionné
+      const newVehicleType = firstVehicle.type === 'confort' ? 'berline' : 'van'
+      setVehicleType(newVehicleType)
+      setValue('vehicleType', newVehicleType)
+    } else {
+      // Fallback si pas de véhicules chargés
+      setSelectedVehicleId(null)
+      setSelectedVehicle(null)
+      setValue('vehicleId', undefined)
+      setVehicleType('berline')
+      setValue('vehicleType', 'berline')
     }
+    
+    // Valeurs par défaut : 1 passager, 0 bagages
+    setPassengerCount(1)
+    setValue('nombrePassagers', '1')
+    setBaggageCount(0)
+    setValue('nombreBagages', '0')
+    
+    // Note: Pour les deux types de service, on garde les adresses
+    // Le transfert a besoin de départ + arrivée
+    // La mise à disposition a besoin au minimum du point de départ
   }
 
-  // Gérer le changement de type de véhicule
-  const handleVehicleTypeChange = (type: 'berline' | 'van') => {
-    setVehicleType(type)
-    setValue('vehicleType', type)
-    // Réinitialiser le nombre de passagers à 1 pour les deux types
-    setPassengerCount(1)
-    setValue('nombrePassagers', '1') // Synchroniser avec le formulaire
-    // Mettre à jour le montant selon le type de véhicule
-    const baseAmount = type === 'berline' ? 5000 : 8000 // 50€ ou 80€ en centimes
-    setPaymentAmount(baseAmount)
+  // Fonction supprimée - le type de véhicule est maintenant géré automatiquement lors de la sélection
+
+  // Gérer la sélection d'un véhicule spécifique
+  const handleVehicleSelect = (vehicleId: number) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId)
+    if (vehicle) {
+      setSelectedVehicleId(vehicleId)
+      setSelectedVehicle(vehicle)
+      setValue('vehicleId', vehicleId)
+      
+      // Mettre à jour automatiquement le type de véhicule selon le véhicule sélectionné
+      const newVehicleType = vehicle.type === 'confort' ? 'berline' : 'van'
+      setVehicleType(newVehicleType)
+      setValue('vehicleType', newVehicleType)
+      
+      // Valeurs par défaut : 1 passager, 0 bagages
+      setPassengerCount(1)
+      setValue('nombrePassagers', '1')
+      setBaggageCount(0)
+      setValue('nombreBagages', '0')
+      
+      // Mettre à jour le montant selon le véhicule sélectionné
+      const baseAmount = vehicle.type === 'confort' ? 5000 : 8000 // 50€ ou 80€ en centimes
+      setPaymentAmount(baseAmount)
+    }
   }
 
   // Gestion du succès de paiement Stripe
@@ -193,6 +275,15 @@ export default function SecureReservationForm() {
       const reservationData = {
         serviceType: data.serviceType,
         vehicleType: data.vehicleType,
+        vehicleId: data.vehicleId || selectedVehicleId,
+        vehicleInfo: selectedVehicle ? {
+          id: selectedVehicle.id,
+          nom: selectedVehicle.nom,
+          plaque: selectedVehicle.plaque,
+          type: selectedVehicle.type,
+          nombre_places: selectedVehicle.nombre_places,
+          nombre_bagages: selectedVehicle.nombre_bagages
+        } : null,
         depart: departValueRef.current || 'Adresse de départ non définie',
         arrivee: arriveeValueRef.current || 'Adresse d\'arrivée non définie',
         originPlace: originPlace,
@@ -207,6 +298,7 @@ export default function SecureReservationForm() {
         nombrePassagers: data.nombrePassagers || passengerCount.toString(),
         nombreBagages: data.nombreBagages || baggageCount.toString(),
         siegeEnfantQuantite: data.siegeEnfantQuantite || '0',
+        rehausseurQuantite: data.rehausseurQuantite || '0',
         bouquetFleurs: data.bouquetFleurs || false,
         assistanceAeroport: data.assistanceAeroport || false,
         commentaires: data.commentaires || '',
@@ -288,6 +380,8 @@ export default function SecureReservationForm() {
           setCurrentStep(1)
           setServiceType('transfert')
           setVehicleType('berline')
+          setSelectedVehicleId(null)
+          setSelectedVehicle(null)
           setPassengerCount(1)
           setBaggageCount(0)
           setPaymentMethod(null)
@@ -301,9 +395,12 @@ export default function SecureReservationForm() {
           reset({
             serviceType: 'transfert',
             vehicleType: 'berline',
+            vehicleId: undefined,
             methodePaiement: 'immediate',
             nombrePassagers: '1',
-            nombreBagages: '0'
+            nombreBagages: '0',
+            siegeEnfantQuantite: '0',
+            rehausseurQuantite: '0'
           })
           
           // Redirection vers l'accueil
@@ -483,84 +580,245 @@ export default function SecureReservationForm() {
             </div>
                 </div>
 
-                  <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    <span className="flex items-center gap-2">
-                      🚗 Type de service
-                    </span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => handleServiceTypeChange('transfert')}
-                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-                        serviceType === 'transfert'
-                          ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-md'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          serviceType === 'transfert' 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600'
-                        }`}>
-                          🚕
-                        </div>
-                        <div>
-                          <div className="font-semibold text-lg mb-1">Transfert</div>
-                          <div className="text-sm opacity-75 mb-2">Point A vers point B</div>
-                          <div className="text-xs font-medium opacity-60">
-                            ✓ Trajet direct
-                          </div>
-                        </div>
-                      </div>
-                      {serviceType === 'transfert' && (
-                        <div className="absolute top-2 right-2">
-                          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </button>
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 sm:p-6 border border-gray-200">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      Choisissez votre service
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Sélectionnez le type de service puis votre véhicule
+                    </p>
+                  </div>
+
+                  {/* Layout en deux colonnes : Service + Véhicules */}
+                  <div className={`grid transition-all duration-500 gap-6 ${
+                    serviceType ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
+                  }`}>
                     
-                    <button
-                      type="button"
-                      onClick={() => handleServiceTypeChange('mise-a-disposition')}
-                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-                        serviceType === 'mise-a-disposition'
-                          ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 text-purple-900 shadow-md'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300 hover:bg-purple-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          serviceType === 'mise-a-disposition' 
-                            ? 'bg-purple-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 group-hover:bg-purple-100 group-hover:text-purple-600'
-                        }`}>
-                          🕐
-                        </div>
-                        <div>
-                          <div className="font-semibold text-lg mb-1">Mise à disposition</div>
-                          <div className="text-sm opacity-75 mb-2">Chauffeur à disposition</div>
-                          <div className="text-xs font-medium opacity-60">
-                            ✓ Flexibilité maximale
+                    {/* Colonne de gauche : Sélection du service */}
+                    <div className={`transition-all duration-500 ${
+                      serviceType ? 'lg:max-w-sm' : 'max-w-none'
+                    }`}>
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => handleServiceTypeChange('transfert')}
+                          className={`w-full relative p-4 rounded-xl border-2 text-left transition-all duration-300 ${
+                            serviceType === 'transfert'
+                              ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25 scale-105'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:shadow-md hover:scale-102'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`text-2xl transition-all duration-200 ${
+                              serviceType === 'transfert' ? 'opacity-100 scale-110' : 'opacity-70'
+                            }`}>
+                              🚕
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-base mb-1">Transfert</div>
+                              <div className={`text-sm transition-colors duration-200 ${
+                                serviceType === 'transfert' ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
+                                Point A vers point B
+                              </div>
+                            </div>
+                            {serviceType === 'transfert' && (
+                              <div className="text-white animate-in zoom-in-50 duration-200">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleServiceTypeChange('mise-a-disposition')}
+                          className={`w-full relative p-4 rounded-xl border-2 text-left transition-all duration-300 ${
+                            serviceType === 'mise-a-disposition'
+                              ? 'border-purple-500 bg-purple-500 text-white shadow-lg shadow-purple-500/25 scale-105'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-purple-400 hover:shadow-md hover:scale-102'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`text-2xl transition-all duration-200 ${
+                              serviceType === 'mise-a-disposition' ? 'opacity-100 scale-110' : 'opacity-70'
+                            }`}>
+                              🕐
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-base mb-1">Mise à disposition</div>
+                              <div className={`text-sm transition-colors duration-200 ${
+                                serviceType === 'mise-a-disposition' ? 'text-purple-100' : 'text-gray-500'
+                              }`}>
+                                Chauffeur à disposition
+                              </div>
+                            </div>
+                            {serviceType === 'mise-a-disposition' && (
+                              <div className="text-white animate-in zoom-in-50 duration-200">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Colonne de droite : Sélection des véhicules */}
+                    {serviceType && (
+                      <div className="animate-in slide-in-from-right-5 duration-500 fade-in">
+                        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                          <h4 className="font-semibold text-gray-900 mb-4 text-center flex items-center justify-center gap-2">
+                            <span>🚗</span>
+                            Choisissez votre véhicule
+                          </h4>
+                          
+                          {vehiclesLoading ? (
+                            <div className="flex justify-center py-12">
+                              <div className="flex items-center gap-3 text-gray-500">
+                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 0 14 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-sm">Chargement...</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {/* Véhicules Confort */}
+                              {vehicles.filter(v => v.type === 'confort').length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="text-sm">🚗</div>
+                                    <h5 className="font-medium text-gray-700 text-xs uppercase tracking-wider">Berlines</h5>
+                                    <div className="flex-1 h-px bg-gray-300"></div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {vehicles.filter(v => v.type === 'confort').map((vehicle) => (
+                                      <button
+                                        key={vehicle.id}
+                                        type="button"
+                                        onClick={() => handleVehicleSelect(vehicle.id)}
+                                        className={`w-full p-3 rounded-lg border-2 text-left transition-all duration-200 ${
+                                          selectedVehicleId === vehicle.id
+                                            ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 scale-105'
+                                            : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-emerald-400 hover:bg-white hover:shadow-md hover:scale-102'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className={`text-lg transition-all duration-200 ${
+                                            selectedVehicleId === vehicle.id ? 'opacity-100 scale-110' : 'opacity-70'
+                                          }`}>
+                                            🚗
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm truncate mb-1">
+                                              {vehicle.display_name}
+                                            </div>
+                                            <div className={`text-xs transition-colors duration-200 ${
+                                              selectedVehicleId === vehicle.id ? 'text-emerald-100' : 'text-gray-500'
+                                            }`}>
+                                              {vehicle.capacity_info}
+                                            </div>
+                                            {serviceType === 'mise-a-disposition' && (
+                                              <div className={`text-xs font-medium transition-colors duration-200 ${
+                                                selectedVehicleId === vehicle.id ? 'text-emerald-200' : 'text-gray-600'
+                                              }`}>
+                                                {vehicle.price_info.base_hourly}€/h
+                                              </div>
+                                            )}
+                                          </div>
+                                          {selectedVehicleId === vehicle.id && (
+                                            <div className="text-white animate-in zoom-in-50 duration-200">
+                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                              </svg>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Véhicules Van */}
+                              {vehicles.filter(v => v.type === 'van').length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="text-sm">🚐</div>
+                                    <h5 className="font-medium text-gray-700 text-xs uppercase tracking-wider">Vans</h5>
+                                    <div className="flex-1 h-px bg-gray-300"></div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {vehicles.filter(v => v.type === 'van').map((vehicle) => (
+                                      <button
+                                        key={vehicle.id}
+                                        type="button"
+                                        onClick={() => handleVehicleSelect(vehicle.id)}
+                                        className={`w-full p-3 rounded-lg border-2 text-left transition-all duration-200 ${
+                                          selectedVehicleId === vehicle.id
+                                            ? 'border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25 scale-105'
+                                            : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-orange-400 hover:bg-white hover:shadow-md hover:scale-102'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className={`text-lg transition-all duration-200 ${
+                                            selectedVehicleId === vehicle.id ? 'opacity-100 scale-110' : 'opacity-70'
+                                          }`}>
+                                            🚐
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm truncate mb-1">
+                                              {vehicle.display_name}
+                                            </div>
+                                            <div className={`text-xs transition-colors duration-200 ${
+                                              selectedVehicleId === vehicle.id ? 'text-orange-100' : 'text-gray-500'
+                                            }`}>
+                                              {vehicle.capacity_info}
+                                            </div>
+                                            {serviceType === 'mise-a-disposition' && (
+                                              <div className={`text-xs font-medium transition-colors duration-200 ${
+                                                selectedVehicleId === vehicle.id ? 'text-orange-200' : 'text-gray-600'
+                                              }`}>
+                                                {vehicle.price_info.base_hourly}€/h
+                                              </div>
+                                            )}
+                                          </div>
+                                          {selectedVehicleId === vehicle.id && (
+                                            <div className="text-white animate-in zoom-in-50 duration-200">
+                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                              </svg>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {vehiclesError && (
+                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                              <div className="flex items-center gap-2 text-amber-800">
+                                <span className="text-sm">⚠️</span>
+                                <span className="font-medium text-sm">Attention</span>
+                              </div>
+                              <div className="text-amber-700 text-xs mt-1">
+                                Impossible de charger la liste des véhicules.
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {serviceType === 'mise-a-disposition' && (
-                        <div className="absolute top-2 right-2">
-                          <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </button>
+                    )}
                   </div>
                 </div>
 
@@ -597,236 +855,125 @@ export default function SecureReservationForm() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="nombrePassagers" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de passagers *
                     </label>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (passengerCount > 1) {
-                            const newCount = passengerCount - 1
-                            setPassengerCount(newCount)
-                            setValue('nombrePassagers', newCount.toString())
-                          }
-                        }}
-                        disabled={passengerCount <= 1}
-                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      
-                      <div className="flex-1 px-3 py-2 text-center border border-gray-300 rounded bg-gray-50 font-medium">
-                        {passengerCount}
-                    </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const maxPassengers = vehicleType === 'berline' ? 3 : 8
-                          if (passengerCount < maxPassengers) {
-                            const newCount = passengerCount + 1
-                            setPassengerCount(newCount)
-                            setValue('nombrePassagers', newCount.toString())
-                          }
-                        }}
-                        disabled={passengerCount >= (vehicleType === 'berline' ? 3 : 8)}
-                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                      </button>
-                    </div>
+                    <select
+                      {...register('nombrePassagers')}
+                      id="nombrePassagers"
+                      value={passengerCount.toString()}
+                      onChange={(e) => {
+                        const newCount = parseInt(e.target.value)
+                        setPassengerCount(newCount)
+                        setValue('nombrePassagers', newCount.toString())
+                      }}
+                      onFocus={(e) => {
+                        // Empêcher le scroll automatique sur mobile
+                        e.preventDefault()
+                        if (window.innerWidth < 768) {
+                          setTimeout(() => {
+                            e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          }, 100)
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
+                      style={{ 
+                        transform: 'translateZ(0)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none'
+                      }}
+                    >
+                      {Array.from({ length: selectedVehicle ? selectedVehicle.nombre_places : (vehicleType === 'berline' ? 3 : 8) }, (_, i) => i + 1).map((num) => (
+                        <option key={num} value={num.toString()}>
+                          {num} passager{num > 1 ? 's' : ''}
+                        </option>
+                      ))}
+                    </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Max {vehicleType === 'berline' ? '3' : '8'}
+                      Max {selectedVehicle ? selectedVehicle.nombre_places : (vehicleType === 'berline' ? '3' : '8')} passagers
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="nombreBagages" className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre de bagages
                     </label>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (baggageCount > 0) {
-                            const newCount = baggageCount - 1
-                            setBaggageCount(newCount)
-                            setValue('nombreBagages', newCount.toString())
-                          }
-                        }}
-                        disabled={baggageCount <= 0}
-                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      
-                      <div className="flex-1 px-3 py-2 text-center border border-gray-300 rounded bg-gray-50 font-medium">
-                        {baggageCount}
-                    </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (baggageCount < 10) {
-                            const newCount = baggageCount + 1
-                            setBaggageCount(newCount)
-                            setValue('nombreBagages', newCount.toString())
-                          }
-                        }}
-                        disabled={baggageCount >= 10}
-                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                      </button>
-                    </div>
+                    <select
+                      {...register('nombreBagages')}
+                      id="nombreBagages"
+                      value={baggageCount.toString()}
+                      onChange={(e) => {
+                        const newCount = parseInt(e.target.value)
+                        setBaggageCount(newCount)
+                        setValue('nombreBagages', newCount.toString())
+                      }}
+                      onFocus={(e) => {
+                        // Empêcher le scroll automatique sur mobile
+                        e.preventDefault()
+                        if (window.innerWidth < 768) {
+                          setTimeout(() => {
+                            e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          }, 100)
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
+                      style={{ 
+                        transform: 'translateZ(0)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none'
+                      }}
+                    >
+                      {Array.from({ length: (selectedVehicle ? selectedVehicle.nombre_bagages : 10) + 1 }, (_, i) => i).map((num) => (
+                        <option key={num} value={num.toString()}>
+                          {num} bagage{num > 1 ? 's' : ''}
+                        </option>
+                      ))}
+                    </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Max 10
+                      Max {selectedVehicle ? selectedVehicle.nombre_bagages : '10'} bagages
                     </p>
                   </div>
 
                   {serviceType === 'mise-a-disposition' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="duree" className="block text-sm font-medium text-gray-700 mb-1">
                         Durée (heures) *
                       </label>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const currentValue = parseInt(watch('duree') || '2')
-                            if (currentValue > 2) {
-                              setValue('duree', (currentValue - 1).toString())
-                            }
-                          }}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                          </svg>
-                        </button>
-                        
-                        <input
+                      <select
                         {...register('duree')}
-                          type="number"
-                          min="2"
-                          max="24"
-                          step="1"
-                          defaultValue="2"
-                          className="flex-1 px-3 py-2 text-center border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const currentValue = parseInt(watch('duree') || '2')
-                            if (currentValue < 24) {
-                              setValue('duree', (currentValue + 1).toString())
-                            }
-                          }}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        </button>
-                      </div>
+                        id="duree"
+                        defaultValue="2"
+                        onFocus={(e) => {
+                          // Empêcher le scroll automatique sur mobile
+                          e.preventDefault()
+                          if (window.innerWidth < 768) {
+                            setTimeout(() => {
+                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            }, 100)
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
+                        style={{ 
+                          transform: 'translateZ(0)',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none'
+                        }}
+                      >
+                        {Array.from({ length: 23 }, (_, i) => i + 2).map((hours) => (
+                          <option key={hours} value={hours.toString()}>
+                            {hours} heure{hours > 1 ? 's' : ''}
+                          </option>
+                        ))}
+                      </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        2-24h
+                        Durée de mise à disposition (2 à 24 heures)
                       </p>
                     </div>
                   )}
             </div>
 
 
-                <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    <span className="flex items-center gap-2">
-                      🚙 Type de véhicule
-                    </span>
-                </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => handleVehicleTypeChange('berline')}
-                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-                        vehicleType === 'berline'
-                          ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-900 shadow-md'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          vehicleType === 'berline' 
-                            ? 'bg-emerald-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 group-hover:bg-emerald-100 group-hover:text-emerald-600'
-                        }`}>
-                          🚗
-                    </div>
-                        <div>
-                          <div className="font-semibold text-lg mb-1">Berline</div>
-                          <div className="text-sm opacity-75 mb-2">1-3 passagers</div>
-                          <div className="text-xs font-medium opacity-60">
-                            ✓ À partir de 50€
-                    </div>
-                  </div>
-                      </div>
-                      {vehicleType === 'berline' && (
-                        <div className="absolute top-2 right-2">
-                          <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                </div>
-              </div>
-            )}
-                    </button>
-                    
-                        <button
-                          type="button"
-                      onClick={() => handleVehicleTypeChange('van')}
-                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-                        vehicleType === 'van'
-                          ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-orange-100 text-orange-900 shadow-md'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:bg-orange-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          vehicleType === 'van' 
-                            ? 'bg-orange-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 group-hover:bg-orange-100 group-hover:text-orange-600'
-                        }`}>
-                          🚐
-                        </div>
-                        <div>
-                          <div className="font-semibold text-lg mb-1">Van</div>
-                          <div className="text-sm opacity-75 mb-2">1-8 passagers</div>
-                          <div className="text-xs font-medium opacity-60">
-                            ✓ À partir de 80€
-                          </div>
-                        </div>
-                      </div>
-                      {vehicleType === 'van' && (
-                        <div className="absolute top-2 right-2">
-                          <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </button>
-                    </div>
-                </div>
+                {/* Section Type de véhicule supprimée - Maintenant géré automatiquement via la sélection de véhicule spécifique */}
                   
 
                   
@@ -931,6 +1078,21 @@ export default function SecureReservationForm() {
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div>
+                        <div className="font-medium text-gray-900">Réhausseurs</div>
+                        <div className="text-sm text-gray-600">€10.00 par réhausseur</div>
+                      </div>
+                      <select
+                        {...register('rehausseurQuantite')}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
                       </select>
                 </div>
 
