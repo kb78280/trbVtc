@@ -21,6 +21,8 @@ Les tables VTC utilisent le préfixe `vtc_` pour éviter tout conflit :
 - vtc_pricing_info         (détails des prix)
 ```
 
+Test
+
 ### 2. Exécution du script SQL
 
 **Option A : phpMyAdmin (Recommandé)**
