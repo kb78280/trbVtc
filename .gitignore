@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-api-php/config.php
+/api-php/config.php
 
 # dependencies
 /node_modules
