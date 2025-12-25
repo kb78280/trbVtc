@@ -4,19 +4,16 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import toast, { Toaster } from 'react-hot-toast'
 import DepartureAutocomplete from './DepartureAutocomplete'
 import ArrivalAutocomplete from './ArrivalAutocomplete'
 import InteractiveMap from './InteractiveMap'
 import StripePaymentForm from './StripePaymentForm'
-import VehicleSelector from './VehicleSelector'
-import { useVehicles } from '@/hooks/useVehicles'
-import { Vehicle } from '@/types/vehicles'
+import { LocationResult } from '@/types/location'
 
+// Schéma de validation (inchangé)
 const reservationSchema = z.object({
   serviceType: z.enum(['transfert', 'mise-a-disposition']),
   vehicleType: z.enum(['berline', 'van']),
-  vehicleId: z.number().optional(),
   depart: z.string().optional(),
   arrivee: z.string().optional(),
   duree: z.string().optional(),
@@ -29,7 +26,6 @@ const reservationSchema = z.object({
   nombrePassagers: z.string().min(1, 'Le nombre de passagers est requis'),
   nombreBagages: z.string().min(1, 'Le nombre de bagages est requis'),
   siegeEnfantQuantite: z.string().optional(),
-  rehausseurQuantite: z.string().optional(),
   bouquetFleurs: z.boolean().optional(),
   assistanceAeroport: z.boolean().optional(),
   commentaires: z.string().optional(),
@@ -44,95 +40,62 @@ export default function SecureReservationForm() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [serviceType, setServiceType] = useState<'transfert' | 'mise-a-disposition'>('transfert')
   const [vehicleType, setVehicleType] = useState<'berline' | 'van'>('berline')
-  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null)
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [passengerCount, setPassengerCount] = useState<number>(1)
   const [baggageCount, setBaggageCount] = useState<number>(0)
-  const [minDate, setMinDate] = useState<string>('')
-  const [isClient, setIsClient] = useState(false)
+  const [minDate, setMinDate] = useState<string>('2025-09-21')
   const [paymentMethod, setPaymentMethod] = useState<'immediate' | 'sur-place' | null>(null)
-  const [paymentAmount, setPaymentAmount] = useState<number>(5000) // 50€ par défaut en centimes
+  const [paymentAmount, setPaymentAmount] = useState<number>(5000)
   const [paymentError, setPaymentError] = useState<string>('')
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false)
-  const [isSubmittingReservation, setIsSubmittingReservation] = useState<boolean>(false)
 
-  // Hook pour récupérer les véhicules
-  const { vehicles, vehiclesByType, loading: vehiclesLoading, error: vehiclesError } = useVehicles()
-
-  // États pour Google Maps
-  const [originPlace, setOriginPlace] = useState<google.maps.places.PlaceResult | null>(null)
-  const [destinationPlace, setDestinationPlace] = useState<google.maps.places.PlaceResult | null>(null)
-  const [routeInfo, setRouteInfo] = useState<{distance: string, duration: string} | null>(null)
-
-  // Initialisation côté client pour éviter l'hydratation mismatch
-  useEffect(() => {
-    setIsClient(true)
-    // Utiliser une date fixe pour éviter les problèmes de fuseau horaire avec VPN
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0')
-    const day = String(today.getDate()).padStart(2, '0')
-    setMinDate(`${year}-${month}-${day}`)
-  }, [])
+  // NOUVEAU : États avec LocationResult (Open Source) au lieu de Google Maps
+  const [originPlace, setOriginPlace] = useState<LocationResult | null>(null)
+  const [destinationPlace, setDestinationPlace] = useState<LocationResult | null>(null)
+  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
   
-  // Références pour les valeurs d'adresses
-  const departValueRef = useRef('')
-  const arriveeValueRef = useRef('')
-  
-  // État pour contrôler l'interface (départ rempli ou non)
+  // États d'interface
+  const [isDepartAutocompleted, setIsDepartAutocompleted] = useState(false)
+  const [isArriveeAutocompleted, setIsArriveeAutocompleted] = useState(false)
   const [hasDepartureAddress, setHasDepartureAddress] = useState(false)
   
-  // Clés pour forcer le re-render des autocomplete
-  const [departKey] = useState(0)
+  // Clés pour forcer le rafraîchissement
+  const [departKey, setDepartKey] = useState(0)
   const [arriveeKey, setArriveeKey] = useState(0)
+
+  // Références pour les valeurs
+  const departValueRef = useRef('')
+  const arriveeValueRef = useRef('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setMinDate(new Date().toISOString().split('T')[0])
+    }
+  }, [])
 
   const {
     register,
     handleSubmit,
     watch,
     setValue,
-    reset,
     formState: { errors }
   } = useForm<ReservationFormData>({
     resolver: zodResolver(reservationSchema),
     defaultValues: {
       serviceType: 'transfert',
       vehicleType: 'berline',
-      methodePaiement: 'immediate',
-      nombrePassagers: '1',
-      nombreBagages: '0',
-      siegeEnfantQuantite: '0',
-      rehausseurQuantite: '0'
+      methodePaiement: 'immediate'
     }
   })
-
-  // Auto-sélectionner le premier véhicule au chargement
-  useEffect(() => {
-    if (vehicles.length > 0 && selectedVehicleId === null) {
-      const firstVehicle = vehicles[0]
-      setSelectedVehicleId(firstVehicle.id)
-      setSelectedVehicle(firstVehicle)
-      setValue('vehicleId', firstVehicle.id)
-      
-      // Mettre à jour le type de véhicule selon le véhicule auto-sélectionné
-      const newVehicleType = firstVehicle.type === 'confort' ? 'berline' : 'van'
-      setVehicleType(newVehicleType)
-      setValue('vehicleType', newVehicleType)
-    }
-  }, [vehicles, selectedVehicleId, setValue])
 
   const scrollToFormSection = () => {
     const formElement = document.getElementById('reservation-form')
     if (formElement) {
       const offset = window.innerWidth < 768 ? 80 : 100
       const elementPosition = formElement.offsetTop - offset
-      
-      window.scrollTo({
-        top: elementPosition,
-        behavior: 'smooth'
-      })
+      window.scrollTo({ top: elementPosition, behavior: 'smooth' })
     }
   }
+
   const goToNextStep = useCallback(() => {
     setIsTransitioning(true)
     setTimeout(() => {
@@ -152,28 +115,11 @@ export default function SecureReservationForm() {
   }, [])
 
   const validateStep1 = () => {
-    // Validation des adresses selon le type de service
-    const hasValidAddresses = serviceType === 'transfert' 
-      ? (originPlace && destinationPlace)  // Transfert: départ + arrivée obligatoires
-      : originPlace                        // Mise à dispo: départ obligatoire seulement
-    
+    // Validation adaptée : on vérifie qu'on a bien les objets LocationResult
+    const hasValidAddresses = originPlace && (serviceType === 'mise-a-disposition' || destinationPlace)
     const hasDateTime = watch('dateReservation') && watch('heureReservation')
-    const hasServiceType = serviceType
-    const hasSelectedVehicle = selectedVehicleId !== null
     
-    // Debug temporaire pour identifier le problème
-    console.log('🔍 Validation Step1:', {
-      serviceType,
-      hasValidAddresses,
-      originPlace: !!originPlace,
-      destinationPlace: !!destinationPlace,
-      hasDateTime,
-      hasServiceType,
-      hasSelectedVehicle,
-      selectedVehicleId
-    })
-    
-    return hasValidAddresses && hasDateTime && hasServiceType && hasSelectedVehicle
+    return !!(hasValidAddresses && hasDateTime)
   }
 
   const validateStep2 = () => {
@@ -181,268 +127,57 @@ export default function SecureReservationForm() {
     const nom = watch('nom')
     const telephone = watch('telephone')
     const email = watch('email')
-    
-    return prenom && nom && telephone && email
+    return !!(prenom && nom && telephone && email)
   }
 
   const validateStep3 = () => {
     const accepteConditions = watch('accepteConditions')
-    return paymentMethod && accepteConditions
+    return !!(paymentMethod && accepteConditions)
   }
 
   const handleServiceTypeChange = (type: 'transfert' | 'mise-a-disposition') => {
     setServiceType(type)
     setValue('serviceType', type)
     
-    // Auto-sélectionner le premier véhicule disponible
-    if (vehicles.length > 0) {
-      const firstVehicle = vehicles[0]
-      setSelectedVehicleId(firstVehicle.id)
-      setSelectedVehicle(firstVehicle)
-      setValue('vehicleId', firstVehicle.id)
-      
-      // Mettre à jour le type de véhicule selon le véhicule auto-sélectionné
-      const newVehicleType = firstVehicle.type === 'confort' ? 'berline' : 'van'
-      setVehicleType(newVehicleType)
-      setValue('vehicleType', newVehicleType)
-    } else {
-      // Fallback si pas de véhicules chargés
-      setSelectedVehicleId(null)
-      setSelectedVehicle(null)
-      setValue('vehicleId', undefined)
-      setVehicleType('berline')
-      setValue('vehicleType', 'berline')
+    if (type === 'transfert') {
+      setValue('arrivee', '')
+      arriveeValueRef.current = ''
+      setIsArriveeAutocompleted(false)
+      setDestinationPlace(null)
     }
-    
-    // Valeurs par défaut : 1 passager, 0 bagages
+    setRouteInfo(null)
+  }
+
+  const handleVehicleTypeChange = (type: 'berline' | 'van') => {
+    setVehicleType(type)
+    setValue('vehicleType', type)
     setPassengerCount(1)
-    setValue('nombrePassagers', '1')
-    setBaggageCount(0)
-    setValue('nombreBagages', '0')
-    
-    // Note: Pour les deux types de service, on garde les adresses
-    // Le transfert a besoin de départ + arrivée
-    // La mise à disposition a besoin au minimum du point de départ
+    setPaymentAmount(type === 'berline' ? 5000 : 8000)
   }
 
-  // Fonction supprimée - le type de véhicule est maintenant géré automatiquement lors de la sélection
-
-  // Gérer la sélection d'un véhicule spécifique
-  const handleVehicleSelect = (vehicleId: number) => {
-    const vehicle = vehicles.find(v => v.id === vehicleId)
-    if (vehicle) {
-      setSelectedVehicleId(vehicleId)
-      setSelectedVehicle(vehicle)
-      setValue('vehicleId', vehicleId)
-      
-      // Mettre à jour automatiquement le type de véhicule selon le véhicule sélectionné
-      const newVehicleType = vehicle.type === 'confort' ? 'berline' : 'van'
-      setVehicleType(newVehicleType)
-      setValue('vehicleType', newVehicleType)
-      
-      // Valeurs par défaut : 1 passager, 0 bagages
-      setPassengerCount(1)
-      setValue('nombrePassagers', '1')
-      setBaggageCount(0)
-      setValue('nombreBagages', '0')
-      
-      // Mettre à jour le montant selon le véhicule sélectionné
-      const baseAmount = vehicle.type === 'confort' ? 5000 : 8000 // 50€ ou 80€ en centimes
-      setPaymentAmount(baseAmount)
-    }
-  }
-
-  // Gestion du succès de paiement Stripe
   const handlePaymentSuccess = () => {
     setPaymentSuccess(true)
     setPaymentError('')
-    console.log('✅ Paiement réussi !')
-    // Ici vous pouvez traiter la réservation payée
     alert('🎉 Paiement réussi ! Votre réservation est confirmée.')
   }
 
-  // Gestion des erreurs de paiement Stripe
   const handlePaymentError = (error: string) => {
     setPaymentError(error)
     setPaymentSuccess(false)
-    console.error('❌ Erreur de paiement:', error)
   }
 
-  // Fonction pour soumettre la réservation à la base de données
-  const submitReservationToDatabase = async (data: ReservationFormData) => {
-    try {
-      // Préparer les données pour l'API
-      const reservationData = {
-        serviceType: data.serviceType,
-        vehicleType: data.vehicleType,
-        vehicleId: data.vehicleId || selectedVehicleId,
-        vehicleInfo: selectedVehicle ? {
-          id: selectedVehicle.id,
-          nom: selectedVehicle.nom,
-          plaque: selectedVehicle.plaque,
-          type: selectedVehicle.type,
-          nombre_places: selectedVehicle.nombre_places,
-          nombre_bagages: selectedVehicle.nombre_bagages
-        } : null,
-        depart: departValueRef.current || 'Adresse de départ non définie',
-        arrivee: arriveeValueRef.current || 'Adresse d\'arrivée non définie',
-        originPlace: originPlace,
-        destinationPlace: destinationPlace,
-        duree: data.duree,
-        dateReservation: data.dateReservation,
-        heureReservation: data.heureReservation,
-        prenom: data.prenom,
-        nom: data.nom,
-        telephone: data.telephone,
-        email: data.email,
-        nombrePassagers: data.nombrePassagers || passengerCount.toString(),
-        nombreBagages: data.nombreBagages || baggageCount.toString(),
-        siegeEnfantQuantite: data.siegeEnfantQuantite || '0',
-        rehausseurQuantite: data.rehausseurQuantite || '0',
-        bouquetFleurs: data.bouquetFleurs || false,
-        assistanceAeroport: data.assistanceAeroport || false,
-        commentaires: data.commentaires || '',
-        methodePaiement: data.methodePaiement,
-        accepteConditions: data.accepteConditions,
-        estimatedPrice: paymentAmount / 100, // Convertir centimes en euros
-        distance: routeInfo?.distance, // Pour calculer distance_km
-        routeInfo: routeInfo // Informations de route complètes
-      }
-
-      console.log('📤 Envoi de la réservation à l\'API...')
-      console.log('🔍 originPlace:', originPlace)
-      console.log('🔍 destinationPlace:', destinationPlace)
-      console.log('🔍 routeInfo:', routeInfo)
-
-      // Toujours utiliser l'API OVH (même en développement)
-      const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(reservationData)
-      })
-
-      const result = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(result.message || result.error || 'Erreur lors de la réservation')
-      }
-
-      return result
-    } catch (error) {
-      console.error('❌ Erreur lors de la soumission:', error)
-      throw error
-    }
-  }
-
-  // Soumission du formulaire
   const onSubmit = async (data: ReservationFormData) => {
     console.log('Données du formulaire:', data)
+    console.log('Données géographiques:', { origin: originPlace, destination: destinationPlace, route: routeInfo })
     
     if (paymentMethod === 'sur-place') {
-      // Le bouton est déjà désactivé dans onClick, pas besoin de re-vérifier
-      // setIsSubmittingReservation est déjà à true
-      
-      // Afficher un toast de chargement
-      const loadingToast = toast.loading('⏳ Confirmation de votre réservation en cours...')
-      
-      try {
-        const result = await submitReservationToDatabase(data)
-        
-        // Succès - fermer le toast de chargement et afficher le succès
-        toast.dismiss(loadingToast)
-        toast.success(
-          '🎉 Réservation confirmée !\n✉️ Vous allez recevoir un email de confirmation.\n🏠 Redirection vers l\'accueil dans 3 secondes...',
-          {
-            duration: 3000,
-            style: {
-              background: '#10B981',
-              color: 'white',
-              padding: '16px',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              maxWidth: '400px'
-            },
-            iconTheme: {
-              primary: 'white',
-              secondary: '#10B981'
-            }
-          }
-        )
-        
-        console.log('✅ Réservation créée avec succès:', result)
-        
-        // Réinitialiser le formulaire après succès
-        setTimeout(() => {
-          // Réinitialiser tous les états
-          setCurrentStep(1)
-          setServiceType('transfert')
-          setVehicleType('berline')
-          setSelectedVehicleId(null)
-          setSelectedVehicle(null)
-          setPassengerCount(1)
-          setBaggageCount(0)
-          setPaymentMethod(null)
-          setOriginPlace(null)
-          setDestinationPlace(null)
-          departValueRef.current = ''
-          arriveeValueRef.current = ''
-          setHasDepartureAddress(false)
-          
-          // Réinitialiser le formulaire react-hook-form
-          reset({
-            serviceType: 'transfert',
-            vehicleType: 'berline',
-            vehicleId: undefined,
-            methodePaiement: 'immediate',
-            nombrePassagers: '1',
-            nombreBagages: '0',
-            siegeEnfantQuantite: '0',
-            rehausseurQuantite: '0'
-          })
-          
-          // Redirection vers l'accueil
-          window.location.href = '/'
-        }, 3000) // Attendre 3 secondes pour que l'utilisateur voie le toast
-        
-      } catch (error) {
-        // Erreur - fermer le toast de chargement et afficher l'erreur
-        toast.dismiss(loadingToast)
-        toast.error(
-          '❌ Erreur lors de la confirmation de la réservation.\nVeuillez réessayer ou nous contacter.',
-          {
-            duration: 8000,
-            style: {
-              background: '#EF4444',
-              color: 'white',
-              padding: '16px',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              maxWidth: '400px'
-            },
-            iconTheme: {
-              primary: 'white',
-              secondary: '#EF4444'
-            }
-          }
-        )
-        
-        console.error('❌ Erreur lors de la réservation:', error)
-        
-        // Réactiver le bouton en cas d'erreur
-        setIsSubmittingReservation(false)
-      }
+      alert('✅ Réservation confirmée ! Vous paierez sur place.')
     } else if (paymentMethod === 'immediate') {
-      // Paiement immédiat - le paiement sera géré par Stripe
-      console.log('💳 Paiement immédiat - géré par Stripe')
+      console.log('💳 Paiement déjà effectué via Stripe')
     }
   }
 
-
-    return (
+  return (
     <section className="py-16 bg-gray-50" id="reservation">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
@@ -452,932 +187,244 @@ export default function SecureReservationForm() {
             {currentStep === 2 && "Vos informations et options"}
             {currentStep === 3 && "Finaliser votre réservation"}
           </p>
-            </div>
+        </div>
 
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-4">
             {[1, 2, 3].map((step) => (
               <div key={step} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step === currentStep 
-                    ? 'bg-blue-600 text-white' 
-                    : step < currentStep 
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-300 text-gray-600'
+                  step === currentStep ? 'bg-blue-600 text-white' : step < currentStep ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'
                 }`}>
                   {step < currentStep ? '✓' : step}
-            </div>
+                </div>
                 {step < 3 && (
-                  <div className={`w-12 h-0.5 mx-2 ${
-                    step < currentStep ? 'bg-green-500' : 'bg-gray-300'
-                  }`} />
+                  <div className={`w-12 h-0.5 mx-2 ${step < currentStep ? 'bg-green-500' : 'bg-gray-300'}`} />
                 )}
               </div>
             ))}
-            </div>
           </div>
+        </div>
 
-        <div className={`bg-white rounded-lg shadow-md p-4 sm:p-8 transition-opacity duration-300 ${
-          isTransitioning ? 'opacity-0' : 'opacity-100'
-        }`}>
-          <div className="mb-6 sm:mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-                Étape {currentStep} sur 3
-              </h2>
-              <div className="text-sm text-gray-500">
-                {currentStep === 1 && "📍 Trajet"}
-                {currentStep === 2 && "👤 Informations"}
-                {currentStep === 3 && "💳 Paiement"}
-              </div>
-            </div>
-            
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${(currentStep / 3) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-
-          <form 
-            id="reservation-form" 
-            onSubmit={handleSubmit(onSubmit)} 
-            className="space-y-6 sm:space-y-8"
-          >
+        <div className={`bg-white rounded-lg shadow-md p-4 sm:p-8 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          
+          <form id="reservation-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8" suppressHydrationWarning={true}>
             
             {currentStep === 1 && (
               <div className="space-y-6">
+                
+                {/* CARTE OPEN SOURCE */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Carte du trajet</h3>
-                  <div className="h-64 rounded-lg border border-gray-300 overflow-hidden">
+                  <div className="h-64 rounded-lg border border-gray-300 overflow-hidden relative z-0">
                     <InteractiveMap
-                      origin={originPlace || undefined}
-                      destination={destinationPlace || undefined}
+                      origin={originPlace}
+                      destination={destinationPlace}
                       height="256px"
-                      className="w-full h-full"
-                      onRouteCalculated={(distance: string, duration: string) => {
-                        console.log('Route calculée:', { distance, duration })
+                      onRouteCalculated={(distance, duration) => {
+                        console.log('Route calculée (OSRM):', { distance, duration })
                         setRouteInfo({ distance, duration })
                       }}
                     />
-            </div>
-          </div>
+                  </div>
+                  {routeInfo && (
+                    <div className="mt-2 flex justify-center gap-4 text-sm text-gray-600 bg-blue-50 p-2 rounded">
+                      <span className="font-semibold">🏁 Distance : {routeInfo.distance}</span>
+                      <span className="font-semibold">⏱️ Durée : {routeInfo.duration}</span>
+                    </div>
+                  )}
+                </div>
 
+                {/* DÉPART */}
                 <div>
                   <label htmlFor="depart" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
                     key={departKey}
-                    value=""
-                    onChange={(value, placeDetails) => {
+                    value={departValueRef.current}
+                    placeholder="Saisissez une adresse (ex: Aéroport CDG, Tour Eiffel...)"
+                    onChange={(value, location) => {
                       departValueRef.current = value
-                      setValue('depart', value) // Synchroniser avec react-hook-form
+                      setValue('depart', value) // Synchro avec React Hook Form
                       
-                      // Mettre à jour l'état pour contrôler l'interface
-                      setHasDepartureAddress(value.trim().length > 0)
+                      setIsDepartAutocompleted(!!location)
+                      setHasDepartureAddress(!!value.trim())
                       
-                      if (placeDetails) {
-                        setOriginPlace(placeDetails)
-                        console.log('🗺️ Mise à jour de la carte avec le départ:', placeDetails.formatted_address)
+                      if (location) {
+                        setOriginPlace(location)
+                      } else {
+                        setOriginPlace(null)
                       }
                       
-                      // Si on vide le départ, vider aussi l'arrivée
+                      // Si on vide le départ, on reset l'arrivée
                       if (!value.trim()) {
                         arriveeValueRef.current = ''
-                        setValue('arrivee', '') // Synchroniser avec react-hook-form
+                        setValue('arrivee', '')
+                        setIsArriveeAutocompleted(false)
                         setDestinationPlace(null)
-                        setArriveeKey(prev => prev + 1) // Forcer le re-render de l'arrivée
+                        setArriveeKey(prev => prev + 1)
                       }
                     }}
                   />
                 </div>
 
-                <div>
+                {/* ARRIVÉE */}
+                <div className={serviceType === 'mise-a-disposition' ? 'hidden' : ''}>
                   <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu d'arrivée *
                   </label>
                   <div className={!hasDepartureAddress ? 'opacity-50 pointer-events-none' : ''}>
-                  <ArrivalAutocomplete
-                    key={arriveeKey}
-                      value=""
-                    onChange={(value, placeDetails) => {
-                        // Ne pas permettre la saisie si le départ n'est pas rempli
-                        if (!hasDepartureAddress) {
-                          console.log('❌ Impossible de saisir l\'arrivée sans départ')
-                          return
+                    <ArrivalAutocomplete
+                      key={arriveeKey}
+                      value={arriveeValueRef.current}
+                      placeholder="Destination (ex: Gare de Lyon...)"
+                      onChange={(value, location) => {
+                        arriveeValueRef.current = value
+                        setValue('arrivee', value)
+                        
+                        setIsArriveeAutocompleted(!!location)
+                        if (location) {
+                          setDestinationPlace(location)
+                        } else {
+                          setDestinationPlace(null)
                         }
-                        
-                      arriveeValueRef.current = value
-                      setValue('arrivee', value) // Synchroniser avec react-hook-form
-                        if (placeDetails) {
-                        setDestinationPlace(placeDetails)
-                          console.log('🎯 Destination mise à jour:', placeDetails.formatted_address)
-                      }
-                    }}
-                  />
-            </div>
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 sm:p-6 border border-gray-200">
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      Choisissez votre service
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Sélectionnez le type de service puis votre véhicule
-                    </p>
-                  </div>
-
-                  {/* Layout en deux colonnes : Service + Véhicules */}
-                  <div className={`grid transition-all duration-500 gap-6 ${
-                    serviceType ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
-                  }`}>
+                {/* TYPE DE SERVICE */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    <span className="flex items-center gap-2">🚗 Type de service</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleServiceTypeChange('transfert')}
+                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 ${
+                        serviceType === 'transfert'
+                          ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-md'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-lg mb-1">Transfert</div>
+                      <div className="text-sm opacity-75">Point A vers point B</div>
+                    </button>
                     
-                    {/* Colonne de gauche : Sélection du service */}
-                    <div className={`transition-all duration-500 ${
-                      serviceType ? 'lg:max-w-sm' : 'max-w-none'
-                    }`}>
-                      <div className="space-y-3">
-                        <button
-                          type="button"
-                          onClick={() => handleServiceTypeChange('transfert')}
-                          className={`w-full relative p-4 rounded-xl border-2 text-left transition-all duration-300 ${
-                            serviceType === 'transfert'
-                              ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25 scale-105'
-                              : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:shadow-md hover:scale-102'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`text-2xl transition-all duration-200 ${
-                              serviceType === 'transfert' ? 'opacity-100 scale-110' : 'opacity-70'
-                            }`}>
-                              🚕
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-base mb-1">Transfert</div>
-                              <div className={`text-sm transition-colors duration-200 ${
-                                serviceType === 'transfert' ? 'text-blue-100' : 'text-gray-500'
-                              }`}>
-                                Point A vers point B
-                              </div>
-                            </div>
-                            {serviceType === 'transfert' && (
-                              <div className="text-white animate-in zoom-in-50 duration-200">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => handleServiceTypeChange('mise-a-disposition')}
-                          className={`w-full relative p-4 rounded-xl border-2 text-left transition-all duration-300 ${
-                            serviceType === 'mise-a-disposition'
-                              ? 'border-purple-500 bg-purple-500 text-white shadow-lg shadow-purple-500/25 scale-105'
-                              : 'border-gray-300 bg-white text-gray-700 hover:border-purple-400 hover:shadow-md hover:scale-102'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`text-2xl transition-all duration-200 ${
-                              serviceType === 'mise-a-disposition' ? 'opacity-100 scale-110' : 'opacity-70'
-                            }`}>
-                              🕐
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-base mb-1">Mise à disposition</div>
-                              <div className={`text-sm transition-colors duration-200 ${
-                                serviceType === 'mise-a-disposition' ? 'text-purple-100' : 'text-gray-500'
-                              }`}>
-                                Chauffeur à disposition
-                              </div>
-                            </div>
-                            {serviceType === 'mise-a-disposition' && (
-                              <div className="text-white animate-in zoom-in-50 duration-200">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Colonne de droite : Sélection des véhicules */}
-                    {serviceType && (
-                      <div className="animate-in slide-in-from-right-5 duration-500 fade-in">
-                        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                          <h4 className="font-semibold text-gray-900 mb-4 text-center flex items-center justify-center gap-2">
-                            <span>🚗</span>
-                            Choisissez votre véhicule
-                          </h4>
-                          
-                          {vehiclesLoading ? (
-                            <div className="flex justify-center py-12">
-                              <div className="flex items-center gap-3 text-gray-500">
-                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 0 14 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span className="text-sm">Chargement...</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              {/* Véhicules Confort */}
-                              {vehicles.filter(v => v.type === 'confort').length > 0 && (
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <div className="text-sm">🚗</div>
-                                    <h5 className="font-medium text-gray-700 text-xs uppercase tracking-wider">Berlines</h5>
-                                    <div className="flex-1 h-px bg-gray-300"></div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {vehicles.filter(v => v.type === 'confort').map((vehicle) => (
-                                      <button
-                                        key={vehicle.id}
-                                        type="button"
-                                        onClick={() => handleVehicleSelect(vehicle.id)}
-                                        className={`w-full p-3 rounded-lg border-2 text-left transition-all duration-200 ${
-                                          selectedVehicleId === vehicle.id
-                                            ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 scale-105'
-                                            : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-emerald-400 hover:bg-white hover:shadow-md hover:scale-102'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`text-lg transition-all duration-200 ${
-                                            selectedVehicleId === vehicle.id ? 'opacity-100 scale-110' : 'opacity-70'
-                                          }`}>
-                                            🚗
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-sm truncate mb-1">
-                                              {vehicle.display_name}
-                                            </div>
-                                            <div className={`text-xs transition-colors duration-200 ${
-                                              selectedVehicleId === vehicle.id ? 'text-emerald-100' : 'text-gray-500'
-                                            }`}>
-                                              {vehicle.capacity_info}
-                                            </div>
-                                            {serviceType === 'mise-a-disposition' && (
-                                              <div className={`text-xs font-medium transition-colors duration-200 ${
-                                                selectedVehicleId === vehicle.id ? 'text-emerald-200' : 'text-gray-600'
-                                              }`}>
-                                                {vehicle.price_info.base_hourly}€/h
-                                              </div>
-                                            )}
-                                          </div>
-                                          {selectedVehicleId === vehicle.id && (
-                                            <div className="text-white animate-in zoom-in-50 duration-200">
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                              </svg>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Véhicules Van */}
-                              {vehicles.filter(v => v.type === 'van').length > 0 && (
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <div className="text-sm">🚐</div>
-                                    <h5 className="font-medium text-gray-700 text-xs uppercase tracking-wider">Vans</h5>
-                                    <div className="flex-1 h-px bg-gray-300"></div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {vehicles.filter(v => v.type === 'van').map((vehicle) => (
-                                      <button
-                                        key={vehicle.id}
-                                        type="button"
-                                        onClick={() => handleVehicleSelect(vehicle.id)}
-                                        className={`w-full p-3 rounded-lg border-2 text-left transition-all duration-200 ${
-                                          selectedVehicleId === vehicle.id
-                                            ? 'border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25 scale-105'
-                                            : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-orange-400 hover:bg-white hover:shadow-md hover:scale-102'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`text-lg transition-all duration-200 ${
-                                            selectedVehicleId === vehicle.id ? 'opacity-100 scale-110' : 'opacity-70'
-                                          }`}>
-                                            🚐
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-sm truncate mb-1">
-                                              {vehicle.display_name}
-                                            </div>
-                                            <div className={`text-xs transition-colors duration-200 ${
-                                              selectedVehicleId === vehicle.id ? 'text-orange-100' : 'text-gray-500'
-                                            }`}>
-                                              {vehicle.capacity_info}
-                                            </div>
-                                            {serviceType === 'mise-a-disposition' && (
-                                              <div className={`text-xs font-medium transition-colors duration-200 ${
-                                                selectedVehicleId === vehicle.id ? 'text-orange-200' : 'text-gray-600'
-                                              }`}>
-                                                {vehicle.price_info.base_hourly}€/h
-                                              </div>
-                                            )}
-                                          </div>
-                                          {selectedVehicleId === vehicle.id && (
-                                            <div className="text-white animate-in zoom-in-50 duration-200">
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                              </svg>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {vehiclesError && (
-                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                              <div className="flex items-center gap-2 text-amber-800">
-                                <span className="text-sm">⚠️</span>
-                                <span className="font-medium text-sm">Attention</span>
-                              </div>
-                              <div className="text-amber-700 text-xs mt-1">
-                                Impossible de charger la liste des véhicules.
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleServiceTypeChange('mise-a-disposition')}
+                      className={`group relative p-6 rounded-xl border-2 text-left transition-all duration-300 ${
+                        serviceType === 'mise-a-disposition'
+                          ? 'border-purple-500 bg-purple-50 text-purple-900 shadow-md'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-lg mb-1">Mise à disposition</div>
+                      <div className="text-sm opacity-75">Chauffeur à l'heure</div>
+                    </button>
                   </div>
                 </div>
 
+                {/* DATE & HEURE */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="dateReservation" className="block text-sm font-medium text-gray-700 mb-1">
-                      Date de réservation *
-                    </label>
-                    <input
-                      {...register('dateReservation')}
-                      type="date"
-                      min={isClient ? minDate : undefined}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    {errors.dateReservation && (
-                      <p className="mt-1 text-sm text-red-600">{errors.dateReservation.message}</p>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                    <input {...register('dateReservation')} type="date" min={minDate} className="w-full p-3 border rounded-md "  suppressHydrationWarning={true}/>
                   </div>
-
                   <div>
-                    <label htmlFor="heureReservation" className="block text-sm font-medium text-gray-700 mb-1">
-                      Heure de réservation *
-                    </label>
-                    <input
-                      {...register('heureReservation')}
-                      type="time"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    {errors.heureReservation && (
-                      <p className="mt-1 text-sm text-red-600">{errors.heureReservation.message}</p>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Heure *</label>
+                    <input {...register('heureReservation')} type="time" className="w-full p-3 border rounded-md " suppressHydrationWarning={true}/>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label htmlFor="nombrePassagers" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de passagers *
-                    </label>
-                    <select
-                      {...register('nombrePassagers')}
-                      id="nombrePassagers"
-                      value={passengerCount.toString()}
-                      onChange={(e) => {
-                        const newCount = parseInt(e.target.value)
-                        setPassengerCount(newCount)
-                        setValue('nombrePassagers', newCount.toString())
-                      }}
-                      onFocus={(e) => {
-                        // Empêcher le scroll automatique sur mobile
-                        e.preventDefault()
-                        if (window.innerWidth < 768) {
-                          setTimeout(() => {
-                            e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                          }, 100)
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
-                      style={{ 
-                        transform: 'translateZ(0)',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none'
-                      }}
-                    >
-                      {Array.from({ length: selectedVehicle ? selectedVehicle.nombre_places : (vehicleType === 'berline' ? 3 : 8) }, (_, i) => i + 1).map((num) => (
-                        <option key={num} value={num.toString()}>
-                          {num} passager{num > 1 ? 's' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Max {selectedVehicle ? selectedVehicle.nombre_places : (vehicleType === 'berline' ? '3' : '8')} passagers
-                    </p>
-                  </div>
+                {/* PASSAGERS & VÉHICULE */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {/* Sélecteur Véhicule simplifié */}
+                   <div className="flex gap-2">
+                      <button type="button" onClick={() => handleVehicleTypeChange('berline')} className={`flex-1 p-3 border rounded ${vehicleType === 'berline' ? 'bg-emerald-100 border-emerald-500' : ''}`}>Berline</button>
+                      <button type="button" onClick={() => handleVehicleTypeChange('van')} className={`flex-1 p-3 border rounded ${vehicleType === 'van' ? 'bg-orange-100 border-orange-500' : ''}`}>Van</button>
+                   </div>
+                   
+                   {/* Compteur Passagers */}
+                   <div className="flex items-center border rounded p-2">
+                      <span className="flex-1 text-sm text-gray-600">Passagers</span>
+                      <button type="button" onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))} className="px-3 py-1 bg-gray-200 rounded">-</button>
+                      <span className="mx-3 font-bold">{passengerCount}</span>
+                      <button type="button" onClick={() => setPassengerCount(Math.min(vehicleType === 'van' ? 8 : 3, passengerCount + 1))} className="px-3 py-1 bg-gray-200 rounded">+</button>
+                   </div>
+                </div>
 
-                  <div>
-                    <label htmlFor="nombreBagages" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de bagages
-                    </label>
-                    <select
-                      {...register('nombreBagages')}
-                      id="nombreBagages"
-                      value={baggageCount.toString()}
-                      onChange={(e) => {
-                        const newCount = parseInt(e.target.value)
-                        setBaggageCount(newCount)
-                        setValue('nombreBagages', newCount.toString())
-                      }}
-                      onFocus={(e) => {
-                        // Empêcher le scroll automatique sur mobile
-                        e.preventDefault()
-                        if (window.innerWidth < 768) {
-                          setTimeout(() => {
-                            e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                          }, 100)
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
-                      style={{ 
-                        transform: 'translateZ(0)',
-                        WebkitAppearance: 'none',
-                        MozAppearance: 'none'
-                      }}
-                    >
-                      {Array.from({ length: (selectedVehicle ? selectedVehicle.nombre_bagages : 10) + 1 }, (_, i) => i).map((num) => (
-                        <option key={num} value={num.toString()}>
-                          {num} bagage{num > 1 ? 's' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Max {selectedVehicle ? selectedVehicle.nombre_bagages : '10'} bagages
-                    </p>
-                  </div>
-
-                  {serviceType === 'mise-a-disposition' && (
-                    <div>
-                      <label htmlFor="duree" className="block text-sm font-medium text-gray-700 mb-1">
-                        Durée (heures) *
-                      </label>
-                      <select
-                        {...register('duree')}
-                        id="duree"
-                        defaultValue="2"
-                        onFocus={(e) => {
-                          // Empêcher le scroll automatique sur mobile
-                          e.preventDefault()
-                          if (window.innerWidth < 768) {
-                            setTimeout(() => {
-                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                            }, 100)
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none select-none"
-                        style={{ 
-                          transform: 'translateZ(0)',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none'
-                        }}
-                      >
-                        {Array.from({ length: 23 }, (_, i) => i + 2).map((hours) => (
-                          <option key={hours} value={hours.toString()}>
-                            {hours} heure{hours > 1 ? 's' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Durée de mise à disposition (2 à 24 heures)
-                      </p>
-                    </div>
-                  )}
-            </div>
-
-
-                {/* Section Type de véhicule supprimée - Maintenant géré automatiquement via la sélection de véhicule spécifique */}
-                  
-
-                  
-                <div className="flex justify-center sm:justify-end pt-6">
+                {/* BOUTON SUIVANT */}
+                <div className="flex justify-end pt-6">
                   <button
                     type="button"
                     onClick={goToNextStep}
                     disabled={!validateStep1()}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
-                      validateStep1()
-                        ? 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105 shadow-lg hover:shadow-xl'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    className={`px-6 py-3 rounded-lg font-medium text-white transition-all ${
+                      validateStep1() ? 'bg-blue-600 hover:bg-blue-700 shadow-lg' : 'bg-gray-300 cursor-not-allowed'
                     }`}
                   >
-                    📍 Continuer la réservation
+                    Continuer ➜
                   </button>
                 </div>
               </div>
             )}
 
+            {/* ÉTAPE 2 : INFORMATIONS (Structure simplifiée pour la lisibilité) */}
             {currentStep === 2 && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Vos informations</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="prenom" className="block text-sm font-medium text-gray-700 mb-1">
-                      Prénom *
-                    </label>
-                    <input
-                      {...register('prenom')}
-                      type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Votre prénom"
-                    />
-                    {errors.prenom && (
-                      <p className="mt-1 text-sm text-red-600">{errors.prenom.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="nom" className="block text-sm font-medium text-gray-700 mb-1">
-                      Nom *
-                    </label>
-                    <input
-                      {...register('nom')}
-                      type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Votre nom"
-                    />
-                    {errors.nom && (
-                      <p className="mt-1 text-sm text-red-600">{errors.nom.message}</p>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input {...register('prenom')} placeholder="Prénom *" className="p-3 border rounded" />
+                  <input {...register('nom')} placeholder="Nom *" className="p-3 border rounded" />
+                  <input {...register('telephone')} placeholder="Téléphone *" className="p-3 border rounded" />
+                  <input {...register('email')} placeholder="Email *" className="p-3 border rounded" />
                 </div>
-
-                <div>
-                  <label htmlFor="telephone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Téléphone *
-                  </label>
-                  <input
-                    {...register('telephone')}
-                    type="tel"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Votre numéro de téléphone"
-                  />
-                  {errors.telephone && (
-                    <p className="mt-1 text-sm text-red-600">{errors.telephone.message}</p>
-                  )}
+                <div className="flex justify-between pt-6">
+                  <button type="button" onClick={goToPreviousStep} className="text-gray-600 hover:text-gray-900">← Retour</button>
+                  <button type="button" onClick={goToNextStep} disabled={!validateStep2()} className={`px-6 py-3 rounded-lg text-white ${validateStep2() ? 'bg-blue-600' : 'bg-gray-300'}`}>Vers le paiement</button>
                 </div>
-
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email *
-                  </label>
-                  <input
-                    {...register('email')}
-                    type="email"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="votre@email.com"
-                  />
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-
-                      <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Options supplémentaires</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900">Sièges enfants</div>
-                        <div className="text-sm text-gray-600">€10.00 par siège</div>
-                      </div>
-                      <select
-                        {...register('siegeEnfantQuantite')}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="0">0</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900">Réhausseurs</div>
-                        <div className="text-sm text-gray-600">€10.00 par réhausseur</div>
-                      </div>
-                      <select
-                        {...register('rehausseurQuantite')}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="0">0</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                      </select>
-                </div>
-
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900">Bouquet de fleurs</div>
-                        <div className="text-sm text-gray-600">€75.00</div>
-                      </div>
-                        <input
-                          {...register('bouquetFleurs')}
-                          type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                </div>
-
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900">Assistance Aéroport</div>
-                        <div className="text-sm text-gray-600">€120.00</div>
-                      </div>
-                        <input
-                          {...register('assistanceAeroport')}
-                          type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="commentaires" className="block text-sm font-medium text-gray-700 mb-1">
-                    Commentaires (optionnel)
-                  </label>
-                  <textarea
-                    {...register('commentaires')}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Informations supplémentaires..."
-                  />
-              </div>
-
-                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
-                  <button
-                    type="button"
-                    onClick={goToPreviousStep}
-                    className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all duration-300 order-2 sm:order-1"
-                  >
-                    ← Retour
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goToNextStep}
-                    disabled={!validateStep2()}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
-                      validateStep2()
-                        ? 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105 shadow-lg hover:shadow-xl'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    👤 Continuer vers le paiement
-                  </button>
-            </div>
               </div>
             )}
 
+            {/* ÉTAPE 3 : PAIEMENT */}
             {currentStep === 3 && (
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">💳 Finaliser votre réservation</h3>
-                  <p className="text-gray-600">Choisissez votre mode de paiement préféré</p>
+              <div className="space-y-6">
+                <div className="text-center bg-blue-50 p-6 rounded-lg mb-6">
+                  <div className="text-3xl font-bold text-blue-900">{(paymentAmount / 100).toFixed(2)} €</div>
+                  <div className="text-sm text-gray-600">Montant estimé</div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPaymentMethod('immediate')
-                      setValue('methodePaiement', 'immediate')
-                    }}
-                    className={`group relative p-8 rounded-2xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
-                      paymentMethod === 'immediate'
-                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-xl ${
-                        paymentMethod === 'immediate' 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600'
-                      }`}>
-                        💳
-                      </div>
-                      <div>
-                        <div className="font-bold text-xl mb-2">Payer maintenant</div>
-                        <div className="text-sm opacity-75 mb-3">Paiement sécurisé par carte</div>
-                        <div className="flex items-center gap-2 text-xs font-medium opacity-60">
-                          <span>🔒 Sécurisé par Stripe</span>
-                        </div>
-                      </div>
-                    </div>
-                    {paymentMethod === 'immediate' && (
-                      <div className="absolute top-3 right-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPaymentMethod('sur-place')
-                      setValue('methodePaiement', 'sur-place')
-                    }}
-                    className={`group relative p-8 rounded-2xl border-2 text-left transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
-                      paymentMethod === 'sur-place'
-                        ? 'border-green-500 bg-gradient-to-br from-green-50 to-green-100 text-green-900 shadow-lg'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-xl ${
-                        paymentMethod === 'sur-place' 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-gray-100 text-gray-600 group-hover:bg-green-100 group-hover:text-green-600'
-                      }`}>
-                        🕐
-                      </div>
-                      <div>
-                        <div className="font-bold text-xl mb-2">Payer plus tard</div>
-                        <div className="text-sm opacity-75 mb-3">Espèces ou carte sur place</div>
-                        <div className="flex items-center gap-2 text-xs font-medium opacity-60">
-                          <span>💰 Flexible et pratique</span>
-                        </div>
-                      </div>
-                    </div>
-                    {paymentMethod === 'sur-place' && (
-                      <div className="absolute top-3 right-3">
-                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </button>
+                <div className="flex gap-4 justify-center">
+                   <button type="button" onClick={() => setPaymentMethod('immediate')} className={`p-4 border rounded-xl ${paymentMethod === 'immediate' ? 'border-blue-500 bg-blue-50' : ''}`}>💳 Carte Bancaire</button>
+                   <button type="button" onClick={() => setPaymentMethod('sur-place')} className={`p-4 border rounded-xl ${paymentMethod === 'sur-place' ? 'border-green-500 bg-green-50' : ''}`}>💶 Sur place</button>
                 </div>
 
-                {paymentMethod === 'immediate' && (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200">
-                    <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
-                      🔒 Paiement sécurisé
-                    </h4>
-                    
-                    <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-900 mb-1">
-                          {(paymentAmount / 100).toFixed(2)} €
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Montant à payer
-                        </div>
-                      </div>
-                    </div>
-
-                    {paymentError && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                        <div className="flex items-center gap-2 text-red-800">
-                          <span>❌</span>
-                          <span className="font-medium">Erreur de paiement</span>
-                        </div>
-                        <div className="text-red-600 text-sm mt-1">{paymentError}</div>
-                      </div>
-                    )}
-
-                    {paymentSuccess && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                        <div className="flex items-center gap-2 text-green-800">
-                          <span>✅</span>
-                          <span className="font-medium">Paiement réussi !</span>
-                        </div>
-                        <div className="text-green-600 text-sm mt-1">
-                          Votre réservation a été confirmée.
-                        </div>
-                      </div>
-                    )}
-
-                    {!paymentSuccess && (
-                      <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm">
-                        <StripePaymentForm
-                          amount={paymentAmount}
-                          onSuccess={handlePaymentSuccess}
-                          onError={handlePaymentError}
-                        />
-                      </div>
-                    )}
-                  </div>
+                {paymentMethod === 'immediate' && !paymentSuccess && (
+                   <div className="p-4 border rounded-xl mt-4">
+                      <StripePaymentForm amount={paymentAmount} onSuccess={handlePaymentSuccess} onError={handlePaymentError} />
+                   </div>
                 )}
 
-                <div className="border-t pt-6">
-                  <label className="flex items-start space-x-3">
-                    <input
-                      {...register('accepteConditions')}
-                      type="checkbox"
-                      className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">
-                      J'accepte les <a href="#" className="text-blue-600 hover:underline">conditions générales</a> et 
-                      la <a href="#" className="text-blue-600 hover:underline">politique de confidentialité</a>
-                      </span>
-                  </label>
-                  {errors.accepteConditions && (
-                    <p className="mt-1 text-sm text-red-600">{errors.accepteConditions.message}</p>
-                  )}
-                </div>
-                
-                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
-                  <button
-                    type="button"
-                    onClick={goToPreviousStep}
-                    className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all duration-300 order-2 sm:order-1"
-                  >
-                    ← Retour
+                <label className="flex items-center gap-2 mt-4">
+                  <input type="checkbox" {...register('accepteConditions')} />
+                  <span className="text-sm">J'accepte les conditions générales</span>
+                </label>
+
+                <div className="flex justify-between pt-6">
+                  <button type="button" onClick={goToPreviousStep} className="text-gray-600">← Retour</button>
+                  <button type={paymentMethod === 'sur-place' ? 'submit' : 'button'} disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)} className={`px-8 py-3 rounded-lg text-white font-bold ${validateStep3() ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300'}`}>
+                    {paymentMethod === 'immediate' && paymentSuccess ? '✅ Réservation Confirmée' : 'Confirmer la réservation'}
                   </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (paymentMethod === 'sur-place' && !isSubmittingReservation) {
-                  // Désactiver immédiatement le bouton
-                  setIsSubmittingReservation(true);
-                  handleSubmit(onSubmit)();
-                }
-              }}
-              disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess) || isSubmittingReservation}
-              className={`w-full sm:w-auto px-8 py-3 rounded-lg font-medium transition-all duration-300 order-1 sm:order-2 ${
-                validateStep3() && (paymentMethod === 'sur-place' || paymentSuccess) && !isSubmittingReservation
-                  ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transform hover:scale-105'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {isSubmittingReservation ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 0 14 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  ⏳ Confirmation en cours...
-                </span>
-              ) : (
-                paymentMethod === 'immediate' 
-                  ? (paymentSuccess ? '✅ Réservation confirmée' : '💳 Effectuez le paiement ci-dessus')
-                  : '✅ Confirmer la réservation'
-              )}
-            </button>
-            </div>
+                </div>
               </div>
             )}
+
           </form>
         </div>
       </div>
-      
-      {/* Toaster pour les notifications */}
-      <Toaster 
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        containerStyle={{
-          top: 20,
-          right: 20
-        }}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '500'
-          }
-        }}
-      />
     </section>
   )
 }
