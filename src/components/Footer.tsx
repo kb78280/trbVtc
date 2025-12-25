@@ -107,6 +107,9 @@ export default function Footer() {
             <p className="text-gray-300 text-sm">
               © 2024 VTC Paris. Tous droits réservés.
             </p>
+            <p className="text-xs text-gray-500 mt-1">
+                Cartographie © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 underline">contributeurs OpenStreetMap</a>
+              </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link href="/mentions-legales" className="text-gray-300 hover:text-white text-sm">
                 Mentions légales

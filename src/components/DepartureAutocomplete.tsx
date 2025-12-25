@@ -1,169 +1,125 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { googleMapsService } from '@/lib/googleMaps'
+import { useState, useEffect, useRef } from 'react'
+import { LocationResult } from '@/types/location'
 
-interface DepartureAutocompleteProps {
-  value: string // Utilisé uniquement pour l'initialisation
-  onChange: (value: string, placeDetails?: google.maps.places.PlaceResult, isAutocompleted?: boolean) => void
-  onError?: (error: string) => void
+interface Props {
+  value: string
+  onChange: (value: string, location?: LocationResult) => void
+  placeholder?: string
   className?: string
   required?: boolean
   disabled?: boolean
 }
 
-export interface DepartureAutocompleteRef {
-  reset: () => void
-  setValue: (value: string) => void
-}
-
-export default function DepartureAutocomplete({
-  value,
-  onChange,
-  onError,
-  className = '',
+export default function DepartureAutocomplete({ 
+  value, 
+  onChange, 
+  placeholder = "Adresse de départ", 
+  className = "",
   required = false,
   disabled = false
-}: DepartureAutocompleteProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [error, setError] = useState('')
-  const [internalValue, setInternalValue] = useState(value) // Initialisation uniquement
-  const [isAutocompleted, setIsAutocompleted] = useState(false) // Suivi de l'état d'autocomplétion
-  const [isClient, setIsClient] = useState(false)
-  
-  const inputRef = useRef<HTMLInputElement>(null)
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+}: Props) {
+  const [query, setQuery] = useState(value)
+  const [results, setResults] = useState<any[]>([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Protection contre l'hydratation mismatch
+  // Sync internal state with prop if it changes externally
   useEffect(() => {
-    setIsClient(true)
+    setQuery(value)
+  }, [value])
+
+  // Fermer la liste si on clique dehors
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // AUCUNE synchronisation externe - complètement isolé
-  // Le composant gère son propre état sans écouter les props
-
-  useEffect(() => {
-    if (!isClient) return
-    const initializeAutocomplete = async () => {
-      try {
-        await googleMapsService.loadGoogleMaps()
-
-        if (inputRef.current) {
-          const autocomplete = googleMapsService.createAutocomplete(inputRef.current)
-          autocompleteRef.current = autocomplete
-
-          autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace()
-            
-            console.log('[DEPART] Place changed:', {
-              hasGeometry: !!place.geometry,
-              hasLocation: !!place.geometry?.location,
-              address: place.formatted_address,
-              placeId: place.place_id
-            })
-            
-            if (!place.geometry || !place.geometry.location) {
-              console.warn('[DEPART] Invalid place selected')
-              setError('Adresse de départ non trouvée. Veuillez sélectionner une suggestion.')
-              onError?.('Adresse non trouvée')
-              return
-            }
-
-            setError('')
-            const formattedAddress = place.formatted_address || ''
-            
-            if (formattedAddress) {
-              console.log('🟢 [DEPART] ✅ AUTOCOMPLETE SUCCESS:', formattedAddress)
-              setInternalValue(formattedAddress)
-              setIsAutocompleted(true) // Marquer comme autocompléé
-              // Forcer la mise à jour de l'input HTML aussi
-              if (inputRef.current) {
-                inputRef.current.value = formattedAddress
-              }
-              onChange(formattedAddress, place, true) // Indiquer que c'est autocompléé
-              
-              setTimeout(() => {
-              }, 100)
-            } else {
-            }
-          })
-
-          setIsLoaded(true)
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Erreur de chargement Google Maps'
-        console.error('[DEPART] Error loading Google Maps:', errorMessage)
-        setError(errorMessage)
-        onError?.(errorMessage)
-      }
-    }
-
-    initializeAutocomplete()
-
-    return () => {
-      if (autocompleteRef.current && googleMapsService.isGoogleMapsLoaded()) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current)
-      }
-    }
-  }, [isClient, onChange, onError])
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    console.log('🟢 [DEPART] 👤 USER TYPING:', newValue)
-    
-    setInternalValue(newValue)
-    setIsAutocompleted(false) // Réinitialiser l'état d'autocomplétion
-    onChange(newValue, undefined, false) // Pas autocompléé
-    
-    if (error) {
-      setError('')
+  // Fonction de recherche vers Nominatim (OSM)
+  const searchAddress = async (q: string) => {
+    if (q.length < 3) return
+    setIsLoading(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=5&countrycodes=fr`
+      )
+      const data = await res.json()
+      setResults(data)
+      setIsOpen(true)
+    } catch (e) {
+      console.error("Erreur recherche:", e)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && autocompleteRef.current) {
-      e.preventDefault()
-    }
-  }
-
-  // Solution simple : garder la valeur stable après autocomplétion
+  // Timer pour éviter de chercher à chaque lettre (debounce)
   useEffect(() => {
-    if (inputRef.current && isAutocompleted) {
-      // Si on a été autocompléé, forcer la valeur stable
-      if (inputRef.current.value !== internalValue) {
-        console.log('🟢 [DEPART] PROTECTING AUTOCOMPLETED VALUE - Restoring:', internalValue)
-        inputRef.current.value = internalValue
+    const timer = setTimeout(() => {
+      if (query && query !== value && query.length >= 3) {
+        searchAddress(query)
       }
+    }, 500) 
+    return () => clearTimeout(timer)
+  }, [query, value])
+
+  const handleSelect = (item: any) => {
+    const newLocation: LocationResult = {
+      label: item.display_name,
+      lat: parseFloat(item.lat),
+      lng: parseFloat(item.lon),
+      place_id: item.osm_id?.toString()
     }
-  })
+    
+    setQuery(item.display_name)
+    setIsOpen(false)
+    // On remonte l'info au parent
+    onChange(item.display_name, newLocation)
+  }
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative w-full">
       <input
-        ref={inputRef}
         type="text"
-        id="depart"
-        name="depart"
-        defaultValue={internalValue} // defaultValue au lieu de value
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Tapez votre adresse de départ..."
-        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${className}`}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          // Si l'utilisateur efface, on prévient le parent
+          if (e.target.value === '') onChange('', undefined)
+        }}
+        placeholder={placeholder}
+        className={`w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`}
         required={required}
-        disabled={disabled || !isLoaded}
+        disabled={disabled}
         autoComplete="off"
-        suppressHydrationWarning
+        // FIX: Suppress hydration warning for browser extension attributes
+        suppressHydrationWarning={true}
       />
       
-      {!isLoaded && (
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+      {isLoading && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
         </div>
       )}
-      
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-50 border border-red-300 rounded-md">
-          <p className="text-sm text-red-600 px-3">{error}</p>
-        </div>
+
+      {isOpen && results.length > 0 && (
+        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+          {results.map((item) => (
+            <li
+              key={item.osm_id}
+              onClick={() => handleSelect(item)}
+              className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 transition-colors"
+            >
+              {item.display_name}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
