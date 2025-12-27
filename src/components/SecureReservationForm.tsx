@@ -154,14 +154,18 @@ export default function SecureReservationForm() {
   const handleServiceTypeChange = (type: 'transfert' | 'mise-a-disposition') => {
     setServiceType(type)
     setValue('serviceType', type)
-    
-    if (type === 'transfert') {
-      setValue('arrivee', '')
-      arriveeValueRef.current = ''
-      setIsArriveeAutocompleted(false)
-      setDestinationPlace(null)
-    }
+    setOriginPlace(null)
+    setDestinationPlace(null)
     setRouteInfo(null)
+    if (departValueRef.current) departValueRef.current = ''
+    if (arriveeValueRef.current) arriveeValueRef.current = ''
+    setValue('depart', '')
+    setValue('arrivee', '')
+    setVehicleType('berline')
+    setValue('vehicleType', 'berline')
+    setPassengerCount(1)
+    setBaggageCount(0)
+    setPaymentAmount(5000)
   }
 
   const handleVehicleTypeChange = (type: 'berline' | 'van') => {
