@@ -36,6 +36,7 @@ const reservationSchema = z.object({
 type ReservationFormData = z.infer<typeof reservationSchema>
 
 export default function SecureReservationForm() {
+
   const [currentStep, setCurrentStep] = useState(1)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [serviceType, setServiceType] = useState<'transfert' | 'mise-a-disposition'>('transfert')
@@ -52,6 +53,8 @@ export default function SecureReservationForm() {
   const [originPlace, setOriginPlace] = useState<LocationResult | null>(null)
   const [destinationPlace, setDestinationPlace] = useState<LocationResult | null>(null)
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
+
+  const isDepartureValid = !!originPlace && !!originPlace.lat;
   
   // États d'interface
   const [isDepartAutocompleted, setIsDepartAutocompleted] = useState(false)
@@ -115,12 +118,25 @@ export default function SecureReservationForm() {
   }, [])
 
   const validateStep1 = () => {
-    // Validation adaptée : on vérifie qu'on a bien les objets LocationResult
-    const hasValidAddresses = originPlace && (serviceType === 'mise-a-disposition' || destinationPlace)
-    const hasDateTime = watch('dateReservation') && watch('heureReservation')
+    // Validation stricte : il faut les objets complets (lat/lng), pas juste du texte
+    const isDepartValid = !!originPlace;
+    const isArriveeValid = serviceType === 'mise-a-disposition' ? true : !!destinationPlace;
     
-    return !!(hasValidAddresses && hasDateTime)
+    const hasDateTime = watch('dateReservation') && watch('heureReservation');
+    
+    return isDepartValid && isArriveeValid && hasDateTime;
   }
+
+  const handleRouteCalculated = useCallback((distance: string, duration: string) => {
+    // Petite sécurité supplémentaire : on ne met à jour que si les valeurs changent vraiment
+    setRouteInfo(prev => {
+      if (prev && prev.distance === distance && prev.duration === duration) {
+        return prev;
+      }
+      console.log('Route calculée (OSRM):', { distance, duration });
+      return { distance, duration };
+    });
+  }, []);
 
   const validateStep2 = () => {
     const prenom = watch('prenom')
@@ -221,10 +237,7 @@ export default function SecureReservationForm() {
                       origin={originPlace}
                       destination={destinationPlace}
                       height="256px"
-                      onRouteCalculated={(distance, duration) => {
-                        console.log('Route calculée (OSRM):', { distance, duration })
-                        setRouteInfo({ distance, duration })
-                      }}
+                      onRouteCalculated={handleRouteCalculated}
                     />
                   </div>
                   {routeInfo && (
@@ -241,32 +254,21 @@ export default function SecureReservationForm() {
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
-                    key={departKey}
-                    value={departValueRef.current}
-                    placeholder="Saisissez une adresse (ex: Aéroport CDG, Tour Eiffel...)"
-                    onChange={(value, location) => {
-                      departValueRef.current = value
-                      setValue('depart', value) // Synchro avec React Hook Form
-                      
-                      setIsDepartAutocompleted(!!location)
-                      setHasDepartureAddress(!!value.trim())
-                      
-                      if (location) {
-                        setOriginPlace(location)
-                      } else {
-                        setOriginPlace(null)
-                      }
-                      
-                      // Si on vide le départ, on reset l'arrivée
-                      if (!value.trim()) {
-                        arriveeValueRef.current = ''
-                        setValue('arrivee', '')
-                        setIsArriveeAutocompleted(false)
-                        setDestinationPlace(null)
-                        setArriveeKey(prev => prev + 1)
-                      }
-                    }}
-                  />
+                        value={departValueRef.current}
+                        onChange={(value, location) => {
+                          departValueRef.current = value
+                          setValue('depart', value)
+                          
+                          // Si location est undefined (l'utilisateur tape), originPlace devient null
+                          setOriginPlace(location || null) 
+                          
+                          // Si on invalide le départ, on reset l'arrivée par sécurité
+                          if (!location) {
+                            setRouteInfo(null) // Efface "Distance: ... Durée: ..."
+                            // On NE touche PAS à destinationPlace ni à arriveeValueRef
+                          }
+                        }}
+                      />
                 </div>
 
                 {/* ARRIVÉE */}
@@ -274,25 +276,35 @@ export default function SecureReservationForm() {
                   <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
                     Lieu d'arrivée *
                   </label>
-                  <div className={!hasDepartureAddress ? 'opacity-50 pointer-events-none' : ''}>
-                    <ArrivalAutocomplete
-                      key={arriveeKey}
-                      value={arriveeValueRef.current}
-                      placeholder="Destination (ex: Gare de Lyon...)"
-                      onChange={(value, location) => {
-                        arriveeValueRef.current = value
-                        setValue('arrivee', value)
-                        
-                        setIsArriveeAutocompleted(!!location)
-                        if (location) {
-                          setDestinationPlace(location)
-                        } else {
-                          setDestinationPlace(null)
-                        }
-                      }}
-                    />
-                  </div>
+                  <div className={!originPlace ? 'opacity-50 pointer-events-none' : ''}>
+                  <ArrivalAutocomplete
+                        value={arriveeValueRef.current}
+                        // On désactive physiquement l'input
+                        disabled={!isDepartureValid} 
+                        placeholder={!isDepartureValid ? "Veuillez d'abord valider le départ..." : "Destination (ex: Gare de Lyon...)"}
+                        onChange={(value, location) => {
+                          arriveeValueRef.current = value
+                          setValue('arrivee', value)
+                          setDestinationPlace(location || null)
+                          if (!location) {
+                            setRouteInfo(null)
+                          }
+                        }}
+                      />
+                    </div>
+                    {!isDepartureValid && (
+                    <p className="text-xs text-orange-600 mt-1 flex items-center">
+                      🔒 Validez une adresse de départ dans la liste pour débloquer la destination.
+                    </p>
+                  )}
+
                 </div>
+                {!originPlace && (
+                  <p className="text-xs text-blue-600 mt-1 flex items-center">
+                    <span className="mr-1">ℹ️</span> 
+                    Veuillez valider une adresse de départ pour saisir la destination.
+                  </p>
+                )}
 
                 {/* TYPE DE SERVICE */}
                 <div>

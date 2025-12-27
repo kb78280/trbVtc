@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { LocationResult } from '@/types/location'
-
+const API_URL = 'https://vtc-transport-conciergerie.fr/api-php/address-proxy.php';
 interface Props {
   value: string
   onChange: (value: string, location?: LocationResult) => void
@@ -36,19 +36,21 @@ export default function ArrivalAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Fonction de recherche vers Nominatim (OSM)
+  // Fonction de recherche vers (OSM)
   const searchAddress = async (q: string) => {
     if (q.length < 3) return
     setIsLoading(true)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=5&countrycodes=fr`
-      )
-      const data = await res.json()
-      setResults(data)
-      setIsOpen(true)
+      const res = await fetch(`${API_URL}?q=${encodeURIComponent(q)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setResults(Array.isArray(data) ? data : [])
+        setIsOpen(true)
+      } else {
+        console.error("Erreur API:", res.status)
+      }
     } catch (e) {
-      console.error("Erreur recherche:", e)
+      console.error("Erreur réseau:", e)
     } finally {
       setIsLoading(false)
     }
@@ -84,9 +86,10 @@ export default function ArrivalAutocomplete({
         type="text"
         value={query}
         onChange={(e) => {
-          setQuery(e.target.value)
+          const newValue = e.target.value
+          setQuery(newValue)
           // Si l'utilisateur efface, on prévient le parent
-          if (e.target.value === '') onChange('', undefined)
+          onChange(newValue, undefined)
         }}
         placeholder={placeholder}
         className={`w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`}

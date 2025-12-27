@@ -31,6 +31,7 @@ export default function AddressAutocomplete({
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const API_URL = 'https://vtc-transport-conciergerie.fr/api-php/address-proxy.php';
 
   // Fermer la liste si on clique dehors
   useEffect(() => {
@@ -48,20 +49,22 @@ export default function AddressAutocomplete({
     setQuery(value)
   }, [value])
 
-  // Fonction de recherche (Nominatim)
+  // Fonction de recherche
   const searchAddress = async (q: string) => {
     if (q.length < 3) return
     setIsLoading(true)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=5&countrycodes=fr`
-      )
-      const data = await res.json()
-      setResults(data)
-      setIsOpen(true)
+      const res = await fetch(`${API_URL}?q=${encodeURIComponent(q)}`)
+      if (res.ok) {
+        const data = await res.json()
+        // Le proxy PHP renvoie déjà le bon format, on l'utilise directement
+        setResults(Array.isArray(data) ? data : [])
+        setIsOpen(true)
+      } else {
+        console.error("Erreur API:", res.status)
+      }
     } catch (e) {
-      console.error("Erreur recherche:", e)
-      if (onError) onError("Erreur de recherche")
+      console.error("Erreur réseau:", e)
     } finally {
       setIsLoading(false)
     }
