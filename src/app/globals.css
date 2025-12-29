@@ -39,27 +39,37 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Force le lissage des polices sur mobile pour une meilleure lisibilité */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Styles pour améliorer le contraste des inputs et selects sur tous les navigateurs */
 input, textarea, select {
-  color: #1f2937 !important; /* Gris très foncé pour le texte saisi */
+  color: #000000 !important; /* Noir pur */
+  background-color: #ffffff !important;
+  border-color: #d1d5db; /* gray-300 */
+}
+input, textarea, select {
+  -webkit-text-fill-color: #000000 !important;
+  opacity: 1 !important; /* Empêche la transparence sur iOS */
 }
 
 input::placeholder, textarea::placeholder {
-  color: #6b7280 !important; /* Gris moyen pour les placeholders */
-  opacity: 1 !important; /* Force l'opacité à 100% sur tous les navigateurs */
+  color: #4b5563 !important; /* gray-600 - plus foncé que le défaut */
+  -webkit-text-fill-color: #4b5563 !important;
+  opacity: 1 !important;
 }
 
 /* Styles spécifiques pour les selects */
 select {
-  color: #1f2937 !important;
-  background-color: #ffffff !important;
+  background-image: none !important; /* Retire le style natif parfois gris */
+  color: #000000 !important;
 }
 
 select option {
-  color: #1f2937 !important;
   background-color: #ffffff !important;
+  color: #000000 !important;
 }
 
 /* Amélioration pour les inputs disabled */
@@ -98,10 +108,18 @@ input::placeholder, textarea::placeholder {
 /* Correction pour les inputs en mode sombre automatique */
 @media (prefers-color-scheme: dark) {
   input, textarea, select {
-    color: #1f2937 !important;
-    -webkit-text-fill-color: #1f2937 !important;
     background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #d1d5db !important;
+    -webkit-text-fill-color: #000000 !important;
   }
+
+  @media screen and (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
   
   input::placeholder, textarea::placeholder {
     color: #6b7280 !important;

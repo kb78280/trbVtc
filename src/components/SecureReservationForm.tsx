@@ -254,7 +254,7 @@ export default function SecureReservationForm() {
 
                 {/* DÉPART */}
                 <div>
-                  <label htmlFor="depart" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="depart" className="block text-sm font-medium text-gray-900 mb-1 font-bold">
                     Lieu de départ *
                   </label>
                   <DepartureAutocomplete
@@ -277,7 +277,7 @@ export default function SecureReservationForm() {
 
                 {/* ARRIVÉE */}
                 <div className={serviceType === 'mise-a-disposition' ? 'hidden' : ''}>
-                  <label htmlFor="arrivee" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="arrivee" className="block text-sm font-medium text-gray-900 mb-1 font-bold">
                     Lieu d'arrivée *
                   </label>
                   <div className={!originPlace ? 'opacity-50 pointer-events-none' : ''}>
@@ -347,12 +347,12 @@ export default function SecureReservationForm() {
                 {/* DATE & HEURE */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1 font-bold">Date *</label>
                     <input {...register('dateReservation')} type="date" min={minDate} className="w-full p-3 border rounded-md "  suppressHydrationWarning={true}/>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Heure *</label>
-                    <input {...register('heureReservation')} type="time" className="w-full p-3 border rounded-md " suppressHydrationWarning={true}/>
+                    <label className="block text-sm font-medium text-gray-900 mb-1 font-bold">Heure *</label>
+                    <input {...register('heureReservation')} type="time" className="w-full p-3 border border-gray-300 rounded-md text-gray-900 font-medium bg-white focus:ring-2 focus:ring-blue-600" suppressHydrationWarning={true}/>
                   </div>
                 </div>
 
@@ -365,10 +365,10 @@ export default function SecureReservationForm() {
                    </div>
                    
                    {/* Compteur Passagers */}
-                   <div className="flex items-center border rounded p-2">
-                      <span className="flex-1 text-sm text-gray-600">Passagers</span>
+                   <div className="flex items-center border border-gray-300 rounded p-2 bg-white">
+                      <span className="flex-1 text-sm font-semibold text-gray-900">Passagers</span>
                       <button type="button" onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))} className="px-3 py-1 bg-gray-200 rounded">-</button>
-                      <span className="mx-3 font-bold">{passengerCount}</span>
+                      <span className="mx-3 font-bold text-xl text-gray-900">{passengerCount}</span>
                       <button type="button" onClick={() => setPassengerCount(Math.min(vehicleType === 'van' ? 8 : 3, passengerCount + 1))} className="px-3 py-1 bg-gray-200 rounded">+</button>
                    </div>
                 </div>
@@ -393,10 +393,10 @@ export default function SecureReservationForm() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input {...register('prenom')} placeholder="Prénom *" className="p-3 border rounded" />
-                  <input {...register('nom')} placeholder="Nom *" className="p-3 border rounded" />
-                  <input {...register('telephone')} placeholder="Téléphone *" className="p-3 border rounded" />
-                  <input {...register('email')} placeholder="Email *" className="p-3 border rounded" />
+                  <input {...register('prenom')} placeholder="Prénom *" className="p-3 border rounded text-gray-900 font-medium" />
+                  <input {...register('nom')} placeholder="Nom *" className="p-3 border rounded text-gray-900 font-medium" />
+                  <input {...register('telephone')} placeholder="Téléphone *" className="p-3 border rounded text-gray-900 font-medium" />
+                  <input {...register('email')} placeholder="Email *" className="p-3 border rounded text-gray-900 font-medium" />
                 </div>
                 <div className="flex justify-between pt-6">
                   <button type="button" onClick={goToPreviousStep} className="text-gray-600 hover:text-gray-900">← Retour</button>

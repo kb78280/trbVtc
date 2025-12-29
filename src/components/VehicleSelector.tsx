@@ -78,9 +78,9 @@ export default function VehicleSelector({
                     🚗
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold text-sm mb-1">{vehicle.display_name}</div>
-                    <div className="text-xs opacity-75 mb-1">{vehicle.capacity_info}</div>
-                    <div className="text-xs font-medium opacity-60">
+                    <div className="font-bold text-base text-gray-900 mb-1">{vehicle.display_name}</div>
+                    <div className="text-sm text-gray-700 font-medium mb-1">{vehicle.capacity_info}</div>
+                    <div className="text-sm font-bold text-blue-700">
                       {serviceType === 'mise-a-disposition' 
                         ? `${vehicle.price_info.base_hourly}€/h` 
                         : `${vehicle.price_info.rate_per_km}€/km`

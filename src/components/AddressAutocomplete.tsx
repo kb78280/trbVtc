@@ -119,12 +119,12 @@ export default function AddressAutocomplete({
       )}
 
       {isOpen && results.length > 0 && (
-        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+        <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-xl mt-1 max-h-60 overflow-auto">
           {results.map((item) => (
             <li
               key={item.osm_id}
               onClick={() => handleSelect(item)}
-              className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 transition-colors text-black"
+              className="p-3 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-900 border-b border-gray-100 last:border-b-0 bg-white"
             >
               {item.display_name}
             </li>
