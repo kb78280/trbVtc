@@ -118,7 +118,7 @@ export default function DepartureAutocomplete({
             <li
               key={item.osm_id}
               onClick={() => handleSelect(item)}
-              className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 transition-colors"
+              className="p-3 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-900 border-b border-gray-100 last:border-b-0 bg-white"
             >
               {item.display_name}
             </li>

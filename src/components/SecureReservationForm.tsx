@@ -360,16 +360,16 @@ export default function SecureReservationForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    {/* Sélecteur Véhicule simplifié */}
                    <div className="flex gap-2">
-                      <button type="button" onClick={() => handleVehicleTypeChange('berline')} className={`flex-1 p-3 border rounded ${vehicleType === 'berline' ? 'bg-emerald-100 border-emerald-500' : ''}`}>Berline</button>
-                      <button type="button" onClick={() => handleVehicleTypeChange('van')} className={`flex-1 p-3 border rounded ${vehicleType === 'van' ? 'bg-orange-100 border-orange-500' : ''}`}>Van</button>
+                      <button type="button" onClick={() => handleVehicleTypeChange('berline')} className={`flex-1 p-3 border rounded transition-colors ${vehicleType === 'berline' ? 'bg-emerald-100 border-emerald-500 text-emerald-900' : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'}`}>Berline</button>
+                      <button type="button" onClick={() => handleVehicleTypeChange('van')} className={`flex-1 p-3 border rounded font-bold transition-colors ${vehicleType === 'van' ? 'bg-orange-100 border-orange-500 text-orange-900' : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'}`}>Van</button>
                    </div>
                    
                    {/* Compteur Passagers */}
                    <div className="flex items-center border border-gray-300 rounded p-2 bg-white">
                       <span className="flex-1 text-sm font-semibold text-gray-900">Passagers</span>
-                      <button type="button" onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))} className="px-3 py-1 bg-gray-200 rounded">-</button>
-                      <span className="mx-3 font-bold text-xl text-gray-900">{passengerCount}</span>
-                      <button type="button" onClick={() => setPassengerCount(Math.min(vehicleType === 'van' ? 8 : 3, passengerCount + 1))} className="px-3 py-1 bg-gray-200 rounded">+</button>
+                      <button type="button" onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))} className="w-8 h-8 flex items-center justify-center bg-gray-200 text-gray-900 font-bold rounded hover:bg-gray-300">-</button>
+                      <span className="mx-4 font-bold text-lg text-gray-900">{passengerCount}</span>
+                      <button type="button" onClick={() => setPassengerCount(Math.min(vehicleType === 'van' ? 8 : 3, passengerCount + 1))} className="w-8 h-8 flex items-center justify-center bg-gray-200 text-gray-900 font-bold rounded hover:bg-gray-300">+</button>
                    </div>
                 </div>
 
@@ -414,8 +414,16 @@ export default function SecureReservationForm() {
                 </div>
 
                 <div className="flex gap-4 justify-center">
-                   <button type="button" onClick={() => setPaymentMethod('immediate')} className={`p-4 border rounded-xl ${paymentMethod === 'immediate' ? 'border-blue-500 bg-blue-50' : ''}`}>💳 Carte Bancaire</button>
-                   <button type="button" onClick={() => setPaymentMethod('sur-place')} className={`p-4 border rounded-xl ${paymentMethod === 'sur-place' ? 'border-green-500 bg-green-50' : ''}`}>💶 Sur place</button>
+                   <button type="button" onClick={() => setPaymentMethod('immediate')} className={`flex-1 p-4 border rounded-xl font-bold transition-all ${
+       paymentMethod === 'immediate' 
+         ? 'border-blue-600 bg-blue-50 text-blue-900 ring-2 ring-blue-600' 
+         : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
+     }`}>💳 Carte Bancaire</button>
+                   <button type="button" onClick={() => setPaymentMethod('sur-place')} className={`flex-1 p-4 border rounded-xl font-bold transition-all ${
+       paymentMethod === 'sur-place' 
+         ? 'border-green-600 bg-green-50 text-green-900 ring-2 ring-green-600' 
+         : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
+     }`}>💶 Sur place</button>
                 </div>
 
                 {paymentMethod === 'immediate' && !paymentSuccess && (
@@ -426,12 +434,16 @@ export default function SecureReservationForm() {
 
                 <label className="flex items-center gap-2 mt-4">
                   <input type="checkbox" {...register('accepteConditions')} />
-                  <span className="text-sm">J'accepte les conditions générales</span>
+                  <span className="text-sm font-bold text-gray-900">J'accepte les conditions générales</span>
                 </label>
 
                 <div className="flex justify-between pt-6">
-                  <button type="button" onClick={goToPreviousStep} className="text-gray-600">← Retour</button>
-                  <button type={paymentMethod === 'sur-place' ? 'submit' : 'button'} disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)} className={`px-8 py-3 rounded-lg text-white font-bold ${validateStep3() ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300'}`}>
+                  <button type="button" onClick={goToPreviousStep} className="text-gray-700 font-semibold hover:text-gray-900 px-4 py-2">← Retour</button>
+                  <button type={paymentMethod === 'sur-place' ? 'submit' : 'button'} disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)} className={`px-6 py-3 rounded-lg font-bold text-white shadow-sm transition-all ${
+      validateStep3() 
+        ? 'bg-green-600 hover:bg-green-700 hover:shadow-lg transform hover:-translate-y-0.5' 
+        : 'bg-gray-400 cursor-not-allowed opacity-70' 
+    }`}>
                     {paymentMethod === 'immediate' && paymentSuccess ? '✅ Réservation Confirmée' : 'Confirmer la réservation'}
                   </button>
                 </div>

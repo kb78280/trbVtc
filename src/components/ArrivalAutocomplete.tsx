@@ -110,7 +110,7 @@ export default function ArrivalAutocomplete({
       )}
 
       {isOpen && results.length > 0 && (
-        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+        <ul className="p-3 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-900 border-b border-gray-100 last:border-b-0 bg-white">
           {results.map((item) => (
             <li
               key={item.osm_id}
