@@ -15,13 +15,23 @@ const icon = L.icon({
   iconAnchor: [12, 41]
 })
 
-// Le composant qui posait problème, maintenant il fonctionne car useMap est importé normalement
-function RecenterMap({ center, zoom }: { center: [number, number], zoom: number }) {
+
+
+function MapController({ center, zoom, routePositions }: { center: [number, number], zoom: number, routePositions: [number, number][] }) {
   const map = useMap()
   
   useEffect(() => {
-    map.setView(center, zoom)
-  }, [center, zoom, map])
+    // Si on a un itinéraire (plus d'un point), on adapte la vue pour tout englober
+    if (routePositions && routePositions.length > 1) {
+      // Crée une "boîte" qui contient tous les points de l'itinéraire
+      const bounds = L.latLngBounds(routePositions)
+      // Ajuste le zoom pour que cette boîte tienne dans l'écran avec une marge de 50px
+      map.fitBounds(bounds, { padding: [50, 50] })
+    } else {
+      // Sinon (juste le départ ou rien), on centre classiquement
+      map.setView(center, zoom)
+    }
+  }, [center, zoom, routePositions, map])
   
   return null
 }
@@ -36,7 +46,7 @@ interface LeafletMapProps {
 
 export default function LeafletMap({ center, zoom, origin, destination, routePositions }: LeafletMapProps) {
   return (
-    <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} dragging={false} attributionControl={false}>
+    <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} dragging={true} attributionControl={false}>
       <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"/>
       
       {origin && <Marker position={[origin.lat, origin.lng]} icon={icon} />}
@@ -45,8 +55,8 @@ export default function LeafletMap({ center, zoom, origin, destination, routePos
       {routePositions.length > 0 && (
         <Polyline positions={routePositions} color="#2563eb" weight={5} opacity={0.7} />
       )}
-      
-      <RecenterMap center={center} zoom={zoom} />
+      <MapController center={center} zoom={zoom} routePositions={routePositions} />
+   
     </MapContainer>
   )
 }

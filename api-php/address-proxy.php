@@ -29,7 +29,11 @@ if (strlen($query) < 3) {
 
 // --- 3. Appel vers API Adresse (Data.gouv.fr) ---
 // Documentation : https://geo.api.gouv.fr/adresse
-$url = "https://api-adresse.data.gouv.fr/search/?q=" . urlencode($query) . "&limit=5&autocomplete=1";
+// Coordonnées de Paris (Centre approximatif) pour prioriser l'Île-de-France
+$lat = '48.8566';
+$lon = '2.3522';
+
+$url = "https://api-adresse.data.gouv.fr/search/?q=" . urlencode($query) . "&limit=5&autocomplete=1&lat=" . $lat . "&lon=" . $lon;;
 
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $url);

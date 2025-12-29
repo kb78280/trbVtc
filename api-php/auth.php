@@ -1,6 +1,20 @@
 <?php
 require_once 'config.php';
 
+// --- CONFIGURATION SÉCURISÉE ---
+
+// Récupération de la clé secrète depuis l'environnement
+$jwtSecret = getenv('JWT_SECRET');
+if (!$jwtSecret) {
+    // Arrêt immédiat si la clé n'est pas configurée
+    http_response_code(500);
+    die(json_encode(['error' => 'Erreur de configuration serveur (JWT_SECRET)']));
+}
+define('JWT_SECRET', $jwtSecret);
+
+
+// --- DÉBUT DU TRAITEMENT ---
+
 // Configuration des headers CORS
 header('Content-Type: application/json');
 header('Access-Control-Allow-Methods: POST, PUT, OPTIONS');
@@ -17,9 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
-
-// JWT Secret depuis les variables d'environnement ou constante
-define('JWT_SECRET', '505fe8378e14a47b3ab31690c3c6bfe79c1e702a8f4e83bb4462f09cf3c42bc7f006a2d1d12b7a49c417b09b21dcb729ada6722bbab6f11917ad5c19fa094318');
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
@@ -62,21 +73,30 @@ try {
 
 // Fonction pour initialiser l'utilisateur (à exécuter une seule fois)
 function handleInitUser() {
+    // Récupération des infos depuis l'environnement
+    $initPassword = getenv('ADMIN_INIT_PASSWORD');
+    $initIdentifiant = getenv('ADMIN_INIT_IDENTIFIANT');
+
+    if (!$initPassword || !$initIdentifiant) {
+        throw new Exception('Configuration ADMIN_INIT_PASSWORD ou ADMIN_INIT_IDENTIFIANT manquante');
+    }
+
     $pdo = getDBConnection();
     
     // Vérifier si l'utilisateur existe déjà
-    $checkSql = "SELECT id FROM vtc_user WHERE username = 'AdminTrb'";
+    $checkSql = "SELECT id FROM vtc_user WHERE username = ?";
     $checkStmt = $pdo->prepare($checkSql);
-    $checkStmt->execute();
+    $checkStmt->execute([$initIdentifiant]);
+    
+    $passwordHash = password_hash($initPassword, PASSWORD_BCRYPT, ['cost' => 12]);
     
     if ($checkStmt->fetch()) {
         // Utilisateur existe, mettre à jour le mot de passe
-        $passwordHash = password_hash('@@Tbensedi27@@', PASSWORD_BCRYPT, ['cost' => 12]);
-        $updateSql = "UPDATE vtc_user SET password_hash = ? WHERE username = 'AdminTrb'";
+        $updateSql = "UPDATE vtc_user SET password_hash = ? WHERE username = ?";
         $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$passwordHash]);
+        $updateStmt->execute([$passwordHash, $initIdentifiant]);
         
-        logError("Mot de passe admin mis à jour", ['username' => 'AdminTrb']);
+        logError("Mot de passe admin réinitialisé via script", ['username' => $initIdentifiant]);
         
         jsonResponse([
             'success' => true,
@@ -84,12 +104,11 @@ function handleInitUser() {
         ]);
     } else {
         // Créer l'utilisateur
-        $passwordHash = password_hash('@@Tbensedi27@@', PASSWORD_BCRYPT, ['cost' => 12]);
         $insertSql = "INSERT INTO vtc_user (username, password_hash) VALUES (?, ?)";
         $insertStmt = $pdo->prepare($insertSql);
-        $insertStmt->execute(['AdminTrb', $passwordHash]);
+        $insertStmt->execute([$initIdentifiant, $passwordHash]);
         
-        logError("Utilisateur admin créé", ['username' => 'AdminTrb']);
+        logError("Utilisateur admin créé", ['username' => $initIdentifiant]);
         
         jsonResponse([
             'success' => true,
