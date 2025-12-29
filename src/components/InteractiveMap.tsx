@@ -63,6 +63,11 @@ export default function InteractiveMap({ origin, destination, height = '400px', 
       setMapCenter([origin.lat, origin.lng])
       setMapZoom(14)
       setRoutePositions([])
+    } else {
+
+      setMapCenter([48.8566, 2.3522])
+      setMapZoom(11)
+      setRoutePositions([])
     }
   }, [origin, destination, onRouteCalculated])
 

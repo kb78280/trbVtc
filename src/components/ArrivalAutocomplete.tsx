@@ -25,6 +25,10 @@ export default function ArrivalAutocomplete({
   const [isLoading, setIsLoading] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    setQuery(value)
+  }, [value])
+  
   // Fermer la liste si on clique dehors
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
