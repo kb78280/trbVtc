@@ -9,6 +9,7 @@ import ArrivalAutocomplete from './ArrivalAutocomplete'
 import InteractiveMap from './InteractiveMap'
 import StripePaymentForm from './StripePaymentForm'
 import { LocationResult } from '@/types/location'
+import { useVehicles } from '@/hooks/useVehicles';
 
 // Schéma de validation (inchangé)
 const reservationSchema = z.object({
@@ -45,7 +46,7 @@ export default function SecureReservationForm() {
   const [baggageCount, setBaggageCount] = useState<number>(0)
   const [minDate, setMinDate] = useState<string>('2025-09-21')
   const [paymentMethod, setPaymentMethod] = useState<'immediate' | 'sur-place' | null>(null)
-  const [paymentAmount, setPaymentAmount] = useState<number>(5000)
+  const [paymentAmount, setPaymentAmount] = useState<number>(0)
   const [paymentError, setPaymentError] = useState<string>('')
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false)
 
@@ -64,7 +65,14 @@ export default function SecureReservationForm() {
   // Clés pour forcer le rafraîchissement
   const [departKey, setDepartKey] = useState(0)
   const [arriveeKey, setArriveeKey] = useState(0)
+  const { vehiclesByType, loading: loadingVehicles } = useVehicles();
 
+  const parseDistance = (distanceStr: string): number => {
+    if (!distanceStr) return 0;
+    // Enlève " km" et remplace la virgule par un point si nécessaire
+    const cleanStr = distanceStr.toLowerCase().replace(' km', '').replace(',', '.');
+    return parseFloat(cleanStr) || 0;
+  };
   // Références pour les valeurs
   const departValueRef = useRef('')
   const arriveeValueRef = useRef('')
@@ -89,6 +97,58 @@ export default function SecureReservationForm() {
       methodePaiement: 'immediate'
     }
   })
+
+  // Effet pour recalculer le prix automatiquement avec la TVA différenciée
+  useEffect(() => {
+    const calculatePrice = () => {
+      const currentVehicles = vehiclesByType[vehicleType === 'berline' ? 'confort' : 'van'];
+      const referenceVehicle = currentVehicles && currentVehicles.length > 0 ? currentVehicles[0] : null;
+
+      if (!referenceVehicle) return;
+
+      let priceInCents = 0;
+
+      if (serviceType === 'transfert') {
+        // --- LOGIQUE TRANSFERT (TVA 10%) ---
+        const TAUX_TVA_TRANSFERT = 1.10; 
+
+        if (routeInfo && routeInfo.distance) {
+          const distanceKm = parseDistance(routeInfo.distance);
+          const ratePerKm = referenceVehicle.price_info.rate_per_km;
+          
+          // Formule : (Distance * TarifKM * 1.10) * 100
+          let price = distanceKm * ratePerKm * TAUX_TVA_TRANSFERT * 100;
+          
+          priceInCents = price;
+        } else {
+          priceInCents = 0; 
+        }
+
+      } else {
+        // --- LOGIQUE MISE À DISPOSITION (TVA 20%) ---
+        const TAUX_TVA_MAD = 1.20;
+
+        const dureeHeures = parseInt(watch('duree') || '0');
+        const tarifHoraire = referenceVehicle.price_info.base_hourly;
+        
+        if (dureeHeures > 0) {
+           // Formule : (Heures * TarifHoraire * 1.20) * 100
+           priceInCents = dureeHeures * tarifHoraire * TAUX_TVA_MAD * 100;
+        }
+      }
+
+      // Mise à jour de l'état (arrondi à l'entier le plus proche)
+      setPaymentAmount(Math.round(priceInCents));
+    };
+
+    calculatePrice();
+  }, [
+    serviceType, 
+    vehicleType, 
+    routeInfo, 
+    vehiclesByType, 
+    watch('duree')
+  ]);
 
   const scrollToFormSection = () => {
     const formElement = document.getElementById('reservation-form')
@@ -161,18 +221,22 @@ export default function SecureReservationForm() {
     if (arriveeValueRef.current) arriveeValueRef.current = ''
     setValue('depart', '')
     setValue('arrivee', '')
+
+    if (type === 'mise-a-disposition') {
+      setValue('duree', '1') 
+  }
+
+
     setVehicleType('berline')
     setValue('vehicleType', 'berline')
     setPassengerCount(1)
     setBaggageCount(0)
-    setPaymentAmount(5000)
   }
 
   const handleVehicleTypeChange = (type: 'berline' | 'van') => {
     setVehicleType(type)
     setValue('vehicleType', type)
     setPassengerCount(1)
-    setPaymentAmount(type === 'berline' ? 5000 : 8000)
   }
 
   const handlePaymentSuccess = () => {
@@ -187,15 +251,56 @@ export default function SecureReservationForm() {
   }
 
   const onSubmit = async (data: ReservationFormData) => {
-    console.log('Données du formulaire:', data)
-    console.log('Données géographiques:', { origin: originPlace, destination: destinationPlace, route: routeInfo })
-    
-    if (paymentMethod === 'sur-place') {
-      alert('✅ Réservation confirmée ! Vous paierez sur place.')
-    } else if (paymentMethod === 'immediate') {
-      console.log('💳 Paiement déjà effectué via Stripe')
+    try {
+      // 1. Préparation des données pour l'API
+      const payload = {
+        ...data,
+        // On envoie le prix calculé (converti de centimes en euros pour l'API PHP)
+        estimatedPrice: paymentAmount / 100, 
+        // On envoie la distance textuelle pour que le PHP puisse extraire les km si besoin
+        distance: routeInfo?.distance || null,
+        // On envoie la distance brute en km si possible
+        distanceKm: routeInfo?.distance ? parseDistance(routeInfo.distance) : null,
+        // On s'assure que la durée est bien envoyée pour les mises à disposition
+        duree: serviceType === 'mise-a-disposition' ? data.duree : null
+      };
+
+      console.log('Envoi de la réservation...', payload);
+
+      // 2. Appel à l'API PHP
+      const response = await fetch('https://vtc-transport-conciergerie.fr/api-php/reservation.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || "Une erreur est survenue lors de la réservation");
+      }
+
+      // 3. Gestion du succès selon le mode de paiement
+      if (paymentMethod === 'sur-place') {
+        alert('✅ Réservation confirmée avec succès ! Vous recevrez un email de confirmation.');
+        // Optionnel : Rediriger vers une page de succès ou reset le formulaire
+        // window.location.href = "/succes"; 
+      } else if (paymentMethod === 'immediate') {
+        // Pour le paiement immédiat, le paiement a déjà été fait via le composant StripePaymentForm
+        // L'API a enregistré la réservation, tout est bon.
+        console.log('💳 Réservation payée et enregistrée');
+        alert('✅ Paiement validé et réservation confirmée ! Vous recevrez un email de confirmation.');
+      }
+
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error);
+      alert('❌ Erreur : ' + (error instanceof Error ? error.message : "Impossible d'enregistrer la réservation"));
     }
   }
+
+
 
   return (
     <section className="py-16 bg-gray-50" id="reservation">
@@ -275,38 +380,58 @@ export default function SecureReservationForm() {
                       />
                 </div>
 
-                {/* ARRIVÉE */}
+                {/* ARRIVÉE (Pour Transfert) */}
                 <div className={serviceType === 'mise-a-disposition' ? 'hidden' : ''}>
                   <label htmlFor="arrivee" className="block text-sm font-medium text-gray-900 mb-1 font-bold">
                     Lieu d'arrivée *
                   </label>
                   <div className={!originPlace ? 'opacity-50 pointer-events-none' : ''}>
-                  <ArrivalAutocomplete
-                        value={arriveeValueRef.current}
-                        // On désactive physiquement l'input
-                        disabled={!isDepartureValid} 
-                        placeholder={!isDepartureValid ? "Veuillez d'abord valider le départ..." : "Destination (ex: Gare de Lyon...)"}
-                        onChange={(value, location) => {
-                          arriveeValueRef.current = value
-                          setValue('arrivee', value)
-                          setDestinationPlace(location || null)
-                          if (!location) {
-                            setRouteInfo(null)
-                          }
-                        }}
-                      />
-                    </div>
-                    {!isDepartureValid && (
+                    <ArrivalAutocomplete
+                      value={arriveeValueRef.current}
+                      disabled={!isDepartureValid}
+                      placeholder={!isDepartureValid ? "Veuillez d'abord valider le départ..." : "Destination (ex: Gare de Lyon...)"}
+                      onChange={(value, location) => {
+                        arriveeValueRef.current = value
+                        setValue('arrivee', value)
+                        setDestinationPlace(location || null)
+                        if (!location) {
+                          setRouteInfo(null)
+                        }
+                      }}
+                    />
+                  </div>
+                  {!isDepartureValid && (
                     <p className="text-xs text-orange-600 mt-1 flex items-center">
                       🔒 Validez une adresse de départ dans la liste pour débloquer la destination.
                     </p>
                   )}
-
                 </div>
+
+                {/* DURÉE (Pour Mise à disposition uniquement) */}
+                {/* DURÉE (Uniquement pour Mise à disposition) */}
+                {serviceType === 'mise-a-disposition' && (
+                  <div>
+                    <label htmlFor="duree" className="block text-sm font-medium text-gray-900 mb-1 font-bold">
+                      Durée souhaitée *
+                    </label>
+                    <select
+                      {...register('duree')}
+                      className="w-full p-3 border border-gray-300 rounded-md text-gray-900 focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      {[...Array(12)].map((_, i) => (
+                        <option key={i} value={i + 1}>
+                          {i + 1} heure{i > 0 ? 's' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Message d'aide si départ non valide (commun aux deux) */}
                 {!originPlace && (
                   <p className="text-xs text-blue-600 mt-1 flex items-center">
                     <span className="mr-1">ℹ️</span> 
-                    Veuillez valider une adresse de départ pour saisir la destination.
+                    Veuillez valider une adresse de départ pour continuer.
                   </p>
                 )}
 
@@ -439,7 +564,7 @@ export default function SecureReservationForm() {
 
                 <div className="flex justify-between pt-6">
                   <button type="button" onClick={goToPreviousStep} className="text-gray-700 font-semibold hover:text-gray-900 px-4 py-2">← Retour</button>
-                  <button type={paymentMethod === 'sur-place' ? 'submit' : 'button'} disabled={!validateStep3() || (paymentMethod === 'immediate' && !paymentSuccess)} className={`px-6 py-3 rounded-lg font-bold text-white shadow-sm transition-all ${
+                  <button type={paymentMethod === 'sur-place' ? 'submit' : 'button'} disabled={!validateStep3() ||  paymentAmount === 0 || (paymentMethod === 'immediate' && !paymentSuccess)} className={`px-6 py-3 rounded-lg font-bold text-white shadow-sm transition-all ${
       validateStep3() 
         ? 'bg-green-600 hover:bg-green-700 hover:shadow-lg transform hover:-translate-y-0.5' 
         : 'bg-gray-400 cursor-not-allowed opacity-70' 
